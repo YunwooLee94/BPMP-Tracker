@@ -27,8 +27,12 @@ catkin_package(
 	std_msgs
 	message_runtime
 )
-file(GLOB BPMP_UTILS_SRC src/bpmp_utils/bernstein_util.cpp src/bpmp_utils/Utils.cpp)
+file(GLOB BPMP_UTILS_SRC src/bpmp_utils/BernsteinUtils.cpp src/bpmp_utils/Utils.cpp)
 file(GLOB BPMP_SIMULATOR_SRC src/bpmp_simulator/*.cpp exe/main_simulator.cpp)
+file(GLOB BPMP_PREDICTOR_SRC src/bpmp_predictor/*.cpp exe/main_predictor.cpp)
 
 add_executable(bpmp_simulator ${BPMP_SIMULATOR_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(bpmp_simulator ${catkin_LIBRARIES} -lstdc++fs)
+
+add_executable(bpmp_predictor ${BPMP_PREDICTOR_SRC} ${BPMP_UTILS_SRC})
+target_link_libraries(bpmp_predictor ${catkin_LIBRARIES} -lstdc++fs)
