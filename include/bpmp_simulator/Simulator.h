@@ -1,0 +1,90 @@
+//
+// Created by larr-laptop on 25. 4. 8.
+//
+
+#ifndef BPMP_TRACKER_SIMULATOR_H
+#define BPMP_TRACKER_SIMULATOR_H
+#include <ros/ros.h>
+#include <string>
+#include <fstream>
+#include <istream>
+#include <visualization_msgs/MarkerArray.h>
+
+#include <pcl_conversions/pcl_conversions.h>
+#include <sensor_msgs/PointCloud.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl_ros/point_cloud.h>
+
+#include <bpmp_tracker/ControlInput.h>
+#include <bpmp_tracker/ControlInputList.h>
+#include <bpmp_tracker/ObjectState.h>
+#include <bpmp_tracker/ObjectStateList.h>
+#include <bpmp_utils/Utils.h>
+#include <algorithm>
+#include <vector>
+#include <ctime>
+
+namespace bpmp{
+    using namespace std;
+    class Simulator{
+    public:
+        Simulator();
+        void Run();
+    private:
+        ros::NodeHandle nh_;
+        bool is_unstructured_{false};
+        double inflation_size_{0.5};
+        double point_resolution_{0.01};
+        double simulation_dt_;
+        string map_frame_id_;
+        double agent_size_;
+        vector<int>object_idx_list_;
+        int total_object_number_in_file_;
+        int object_number_;
+        int target_idx_;
+        int moving_obstacle_number_;
+        vector<int> obstacle_idx_list_;
+
+        pcl::PointCloud<pcl::PointXYZ> point_cloud_;
+        vector<StateHistory> object_history_list_;
+        State current_tracker_state_;
+        ControlInput tracker_control_input;
+        State current_target_state_;
+        vector<State> current_obstacle_state_list_;
+        string initial_state_file_name_;
+        string object_history_file_name_;
+        string obstacle_configuration_file_name_;
+
+        void ReadInitialTrackerStateList();
+        void ReadObjectTrajectory();
+        void ReadObstacleConfiguration();
+        void UpdateDynamics(const double &t);
+        void PrepareRosMsgs(const double &t);
+        void PublishRosMsgs();
+
+        visualization_msgs::MarkerArray obstacle_list_vis_;
+        visualization_msgs::Marker obstacle_vis_;
+        visualization_msgs::Marker target_vis_;
+        visualization_msgs::Marker tracker_vis_;
+        visualization_msgs::MarkerArray pcl_boxes_vis_;
+
+        ros::Publisher target_vis_publisher_;
+        ros::Publisher obstacle_list_vis_publisher_;
+        ros::Publisher tracker_vis_publisher_;
+        ros::Publisher pcl_publisher_;
+        ros::Publisher pcl_boxes_vis_publisher_;
+
+        ros::Subscriber control_input_subscriber_;
+        void control_input_callback(const bpmp_tracker::ControlInput &msg);
+        ros::Publisher target_state_publisher_;
+        ros::Publisher obstacle_state_list_publisher_;
+        ros::Publisher tracker_state_publisher_;
+        bpmp_tracker::ObjectState target_state_msg_;
+        bpmp_tracker::ObjectStateList obstacle_state_list_msg_;
+        bpmp_tracker::ObjectState tracker_state_msg_;
+
+
+    };
+}
+
+#endif //BPMP_TRACKER_SIMULATOR_H
