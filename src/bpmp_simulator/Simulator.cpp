@@ -74,7 +74,7 @@ bpmp::Simulator::Simulator() : nh_("~") {
     obstacle_vis_.pose.orientation.y = 0.0;
     obstacle_vis_.pose.orientation.z = 0.0;
 
-    target_vis_.type = visualization_msgs::Marker::CYLINDER;
+    target_vis_.type = visualization_msgs::Marker::SPHERE;
     target_vis_.ns = "Target";
     target_vis_.id = 0;
     target_vis_.color.a = 1.0;
