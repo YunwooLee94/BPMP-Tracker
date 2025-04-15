@@ -18,6 +18,11 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${DECOMP_UTIL_INCLUDE_DIRS})
 find_package(Boost REQUIRED COMPONENTS thread)
 include_directories(${Boost_INCLUD_DIRS})
 
+find_package(PCL REQUIRED)
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+
 add_message_files(FILES ControlInput.msg ControlInputList.msg ObjectState.msg ObjectStateList.msg PolyState.msg RobotState.msg)
 generate_messages(DEPENDENCIES std_msgs)
 

@@ -7,6 +7,8 @@ bpmp::RosTypeConverter::RosTypeConverter():nh_("~") {
     t0_ = ros::Time::now().toSec();
     TargetPositionSubscriber_ = nh_.subscribe("/target_pose",1,&RosTypeConverter::TargtPositionCallback,this);
     TargetStatePublisher_ = nh_.advertise<bpmp_tracker::ObjectState>("/bpmp_simulator/target_state",1);
+    PclSubscriber_ = nh_.subscribe("/points_masked",1,&RosTypeConverter::PclCallback,this);
+    PclPublisher_ = nh_.advertise<sensor_msgs::PointCloud2>("/bpmp_simulator/point_cloud_obstacle",1);
 }
 
 void bpmp::RosTypeConverter::Run() {
@@ -75,4 +77,11 @@ void bpmp::RosTypeConverter::RobotOdometryCallback(const nav_msgs::OdometryConst
 
 void bpmp::RosTypeConverter::Publish() {
     TargetStatePublisher_.publish(current_target_state_);
+    PclPublisher_.publish(pcl_output_);
+}
+
+void bpmp::RosTypeConverter::PclCallback(const pcl::PointCloud<pcl::PointXYZ> &msg) {
+    pcl::toROSMsg(msg,pcl_output_);
+    pcl_output_.header.frame_id="map";
+    pcl_output_.header.stamp = ros::Time::now();
 }

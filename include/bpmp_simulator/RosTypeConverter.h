@@ -10,6 +10,9 @@
 #include <bpmp_tracker/RobotState.h>
 #include <bpmp_tracker/ObjectState.h>
 #include <vector>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl_ros/point_cloud.h>
+
 namespace bpmp{
     struct TargetVelocity{
         double vx;
@@ -23,7 +26,9 @@ namespace bpmp{
         ros::NodeHandle nh_;
         ros::Subscriber TargetPositionSubscriber_;
         ros::Subscriber RobotOdometrySuscriber_;
+        ros::Subscriber PclSubscriber_;
         ros::Publisher TargetStatePublisher_;
+        ros::Publisher PclPublisher_;
         double t0_;
         double t0_history_;
         int odom_count_=0;
@@ -32,6 +37,8 @@ namespace bpmp{
         bool is_target_position_received_{false};
         bool is_unicycle_state_received_{false};
         void TargtPositionCallback(const geometry_msgs::PoseStampedConstPtr &msg);
+        void PclCallback(const pcl::PointCloud<pcl::PointXYZ> &msg);
+        sensor_msgs::PointCloud2 pcl_output_;
         void RobotOdometryCallback(const nav_msgs::OdometryConstPtr &msg);
         bpmp_tracker::ObjectState current_target_state_;
         bpmp_tracker::ObjectState previous_target_state_;
