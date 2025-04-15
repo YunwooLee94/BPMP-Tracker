@@ -9,7 +9,7 @@
 #include <fstream>
 #include <istream>
 #include <visualization_msgs/MarkerArray.h>
-
+#include <nav_msgs/Odometry.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -48,7 +48,9 @@ namespace bpmp{
         pcl::PointCloud<pcl::PointXYZ> point_cloud_;
         vector<StateHistory> object_history_list_;
         State current_tracker_state_;
+        UnicycleState current_unicycle_state_;
         ControlInput tracker_control_input;
+        UnicycleControlInput unicycle_control_input_;
         State current_target_state_;
         vector<State> current_obstacle_state_list_;
         string initial_state_file_name_;
@@ -65,7 +67,7 @@ namespace bpmp{
         visualization_msgs::MarkerArray obstacle_list_vis_;
         visualization_msgs::Marker obstacle_vis_;
         visualization_msgs::Marker target_vis_;
-        visualization_msgs::Marker tracker_vis_;
+        nav_msgs::Odometry tracker_vis_;
         visualization_msgs::MarkerArray pcl_boxes_vis_;
 
         ros::Publisher target_vis_publisher_;

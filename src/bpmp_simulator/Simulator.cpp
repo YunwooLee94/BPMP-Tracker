@@ -44,21 +44,8 @@ bpmp::Simulator::Simulator() : nh_("~") {
 
     obstacle_vis_.header.frame_id = map_frame_id_;
     target_vis_.header.frame_id = map_frame_id_;
-
     tracker_vis_.header.frame_id = map_frame_id_;
-    tracker_vis_.type = visualization_msgs::Marker::CYLINDER;
-    tracker_vis_.ns = "Tracker";
-    tracker_vis_.color.a = 1.0;
-    tracker_vis_.color.r = 0.0;
-    tracker_vis_.color.g = 0.0;
-    tracker_vis_.color.b = 1.0;
-    tracker_vis_.scale.x = 2 * agent_size_;
-    tracker_vis_.scale.y = 2 * agent_size_;
-    tracker_vis_.scale.z = 2.0;
-    tracker_vis_.pose.orientation.w = 1.0;
-    tracker_vis_.pose.orientation.x = 0.0;
-    tracker_vis_.pose.orientation.y = 0.0;
-    tracker_vis_.pose.orientation.z = 0.0;
+
 
     obstacle_vis_.type = visualization_msgs::Marker::CYLINDER;
     obstacle_vis_.ns = "Obstacle";
@@ -93,7 +80,7 @@ bpmp::Simulator::Simulator() : nh_("~") {
 
     target_vis_publisher_ = nh_.advertise<visualization_msgs::Marker>("target_vis", 1);
     obstacle_list_vis_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("obstacle_list_vis", 1);
-    tracker_vis_publisher_ = nh_.advertise<visualization_msgs::Marker>("tracker_vis", 1);
+    tracker_vis_publisher_ = nh_.advertise<nav_msgs::Odometry>("/base_odom", 1);
 
     obstacle_state_list_publisher_ = nh_.advertise<bpmp_tracker::ObjectStateList>("obstacle_state_list", 1);
     target_state_publisher_ = nh_.advertise<bpmp_tracker::ObjectState>("target_state", 1);
@@ -182,25 +169,23 @@ void bpmp::Simulator::UpdateDynamics(const double &t) {
 
     static double t_prev = t;
     double dt = t - t_prev;
-
-    current_tracker_state_.px = current_tracker_state_.px + current_tracker_state_.vx * dt;
-    current_tracker_state_.py = current_tracker_state_.py + current_tracker_state_.vy * dt;
-    current_tracker_state_.pz = current_tracker_state_.pz + current_tracker_state_.vz * dt;
-    current_tracker_state_.vx = current_tracker_state_.vx + tracker_control_input.ax * dt;
-    current_tracker_state_.vy = current_tracker_state_.vy + tracker_control_input.ay * dt;
-    current_tracker_state_.vz = current_tracker_state_.vz + tracker_control_input.az * dt;
-
+    current_unicycle_state_.px = current_unicycle_state_.px + unicycle_control_input_.linear_speed*cos(current_unicycle_state_.theta)*dt;
+    current_unicycle_state_.py = current_unicycle_state_.py + unicycle_control_input_.linear_speed*sin(current_unicycle_state_.theta)*dt;
+    current_unicycle_state_.theta = current_unicycle_state_.theta +unicycle_control_input_.angular_speed*dt;
+//    std::cout<<"DT: "<<dt<<std::endl;
     t_prev = t;
 }
 
 void bpmp::Simulator::ReadInitialTrackerStateList() {
     std::ifstream initial_state_file;
     initial_state_file.open(initial_state_file_name_.c_str());
-    State tracker_state;
     if (initial_state_file.is_open())
-        initial_state_file>>current_tracker_state_.px >>current_tracker_state_.py >>current_tracker_state_.pz;
+        initial_state_file>>current_unicycle_state_.px >>current_unicycle_state_.py >>current_unicycle_state_.theta;
+    else{
+        current_unicycle_state_.px = 0.0, current_unicycle_state_.py = 0.0, current_unicycle_state_.theta = 0.0;
+    }
     initial_state_file.close();
-    tracker_control_input.px =0.0, tracker_control_input.py =0.0,tracker_control_input.pz =0.0;
+    unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
 }
 
 void bpmp::Simulator::PrepareRosMsgs(const double &t) {
@@ -219,11 +204,14 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
         obstacle_vis_.pose.position.z = current_obstacle_state_list_[i].pz;
         obstacle_list_vis_.markers.push_back(obstacle_vis_);
     }
-    // Tracker Visualization
-    tracker_vis_.id = 0;
-    tracker_vis_.pose.position.x = current_tracker_state_.px;
-    tracker_vis_.pose.position.y = current_tracker_state_.py;
-    tracker_vis_.pose.position.z = current_tracker_state_.pz;
+    // Tracker Visualization (Nav_msgs in Unicycle Simulator)
+    tracker_vis_.pose.pose.position.x = current_unicycle_state_.px;
+    tracker_vis_.pose.pose.position.y = current_unicycle_state_.py;
+    tracker_vis_.pose.pose.position.z = 0.0;
+    tracker_vis_.pose.pose.orientation.x = 0.0;
+    tracker_vis_.pose.pose.orientation.y = 0.0;
+    tracker_vis_.pose.pose.orientation.z = sin(0.5*current_unicycle_state_.theta);
+    tracker_vis_.pose.pose.orientation.w = cos(0.5*current_unicycle_state_.theta);
     // target_state
     target_state_msg_.px = current_target_state_.px;
     target_state_msg_.py = current_target_state_.py;

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="rviz_display" default="true"/>
+    <group if = "$(arg rviz_display)">
+        <node name="rviz" pkg="rviz" type="rviz" args="-d $(find bpmp_tracker)/launch/rviz_config/unstructured_sim.rviz" output="log"/>
+    </group>
+
+    <node pkg="bpmp_tracker" type="bpmp_predictor" name="bpmp_predictor" output="screen">
+        <rosparam command="load" file="$(find bpmp_tracker)/param/predictor.yaml"/>
+        <rosparam command="load" file="$(find bpmp_tracker)/param/prediction_visualizer.yaml"/>
+        <remap from="/bpmp_simulator/point_cloud_obstacle" to="/points_masked"/>
+    </node>
+    <node pkg="bpmp_tracker" type="bpmp_ros_type_converter" name="bpmp_ros_type_converter" output="screen">
+    </node>
+
+</launch>
