@@ -11,6 +11,8 @@ bpmp::RosTypeConverter::RosTypeConverter():nh_("~") {
     PclPublisher_ = nh_.advertise<sensor_msgs::PointCloud2>("/bpmp_simulator/point_cloud_obstacle",1);
     UnicycleInputSubscriber_ = nh_.subscribe("/bpmp_tracker/unicycle_control_input",1,&RosTypeConverter::UnicycleInputCallback,this);
     UnicycleInputPublisher_ = nh_.advertise<geometry_msgs::Twist>("/move_base/cmd_vel",1);
+    RobotOdometrySuscriber_ = nh_.subscribe("/base_odom", 1,
+                                            &RosTypeConverter::RobotOdometryCallback, this);
 }
 
 void bpmp::RosTypeConverter::Run() {
@@ -74,7 +76,11 @@ void bpmp::RosTypeConverter::TargtPositionCallback(const geometry_msgs::PoseStam
 }
 
 void bpmp::RosTypeConverter::RobotOdometryCallback(const nav_msgs::OdometryConstPtr &msg) {
-
+    tf::Transform transform;
+    transform.setOrigin(tf::Vector3(msg->pose.pose.position.x,msg->pose.pose.position.y,msg->pose.pose.position.z));
+    tf::Quaternion q(msg->pose.pose.orientation.x,msg->pose.pose.orientation.y,msg->pose.pose.orientation.z,msg->pose.pose.orientation.w);
+    transform.setRotation(q);
+    br_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "current"));
 }
 
 void bpmp::RosTypeConverter::Publish() {
