@@ -41,6 +41,8 @@ bpmp::Predictor::Predictor():nh_("~") {
 
     raw_primitive_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("TargetRawPrimitive", 1);
     feasible_primitive_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("TargetFeasiblePrimitive", 1);
+    prediction_result_publisher_ = nh_.advertise<bpmp_tracker::PolyState>("target_prediction", 1);
+
     best_primitive_publisher_ = nh_.advertise<visualization_msgs::Marker>("TargetBestPrimitive", 1);
     corridor_publisher_ = nh_.advertise<decomp_ros_msgs::PolyhedronArray>("corridor", 1);
 }
@@ -84,16 +86,16 @@ void bpmp::Predictor::UpdateResult() {
         feasible_primitive_publisher_.publish(visualizer_.VisualizeFeasiblePrimitives(primitive_, safe_index_));
     if (not primitive_.empty() and not safe_index_.empty()) {
         best_primitive_publisher_.publish(visualizer_.VisualizeBestPrimitive(primitive_, best_prediction_index_));
-//        // Polynomial Description
-//        dmvc_tracker::PolyState result;
-//        result.t0 = 0.0;
-//        result.tf = param_.horizon;
-//        for (int i = 0; i < 4; i++) {
-//            result.x_coeff.push_back(primitive_[best_prediction_index_].ctrl_x[i]);
-//            result.y_coeff.push_back(primitive_[best_prediction_index_].ctrl_y[i]);
-//            result.z_coeff.push_back(primitive_[best_prediction_index_].ctrl_z[i]);
-//        }
-//        prediction_result_publisher_.publish(result);
+        // Polynomial Description
+        bpmp_tracker::PolyState result;
+        result.t0 = GetCurrentTime();
+        result.tf = GetCurrentTime()+param_.horizon;
+        for (int i = 0; i < 4; i++) {
+            result.x_coeff.push_back(primitive_[best_prediction_index_].ctrl_x[i]);
+            result.y_coeff.push_back(primitive_[best_prediction_index_].ctrl_y[i]);
+            result.z_coeff.push_back(primitive_[best_prediction_index_].ctrl_z[i]);
+        }
+        prediction_result_publisher_.publish(result);
     }
     if (not polys_.empty()) {
         decomp_ros_msgs::PolyhedronArray polyhedron_msg = DecompROS::polyhedron_array_to_ros(polys_);
@@ -146,7 +148,7 @@ void bpmp::Predictor::SampleEndPointsSubProcess(const int &start_idx, const int 
     for (int i = 0; i < n_rows; i++) {
         tempPoint.x = gaussian_data_eigen.coeffRef(i, 0);
         tempPoint.y = gaussian_data_eigen.coeffRef(i, 1);
-        tempPoint.z = gaussian_data_eigen.coeffRef(i, 2);
+        tempPoint.z = end_point_center.z;
         endpoint_list_sub.push_back(tempPoint);
     }
 }

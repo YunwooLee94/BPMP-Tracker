@@ -75,6 +75,7 @@ namespace bpmp{
     struct UnicycleState{
         double px;
         double py;
+        double pz;
         double theta;
     };
     struct UnicycleControlInput{

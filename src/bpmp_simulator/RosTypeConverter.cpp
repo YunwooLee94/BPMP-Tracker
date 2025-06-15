@@ -9,6 +9,8 @@ bpmp::RosTypeConverter::RosTypeConverter():nh_("~") {
     TargetStatePublisher_ = nh_.advertise<bpmp_tracker::ObjectState>("/bpmp_simulator/target_state",1);
     PclSubscriber_ = nh_.subscribe("/points_masked",1,&RosTypeConverter::PclCallback,this);
     PclPublisher_ = nh_.advertise<sensor_msgs::PointCloud2>("/bpmp_simulator/point_cloud_obstacle",1);
+    UnicycleInputSubscriber_ = nh_.subscribe("/bpmp_tracker/unicycle_control_input",1,&RosTypeConverter::UnicycleInputCallback,this);
+    UnicycleInputPublisher_ = nh_.advertise<geometry_msgs::Twist>("/move_base/cmd_vel",1);
 }
 
 void bpmp::RosTypeConverter::Run() {
@@ -84,4 +86,15 @@ void bpmp::RosTypeConverter::PclCallback(const pcl::PointCloud<pcl::PointXYZ> &m
     pcl::toROSMsg(msg,pcl_output_);
     pcl_output_.header.frame_id="map";
     pcl_output_.header.stamp = ros::Time::now();
+}
+
+void bpmp::RosTypeConverter::UnicycleInputCallback(const bpmp_tracker::UnicycleInput &msg) {
+    geometry_msgs::Twist control_input;
+    control_input.linear.x = msg.vel_linear;
+    control_input.linear.y = 0.0;
+    control_input.linear.z = 0.0;
+    control_input.angular.x = 0.0;
+    control_input.angular.y = 0.0;
+    control_input.angular.z = msg.vel_angular;
+    UnicycleInputPublisher_.publish(control_input);
 }

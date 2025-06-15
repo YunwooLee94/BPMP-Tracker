@@ -84,7 +84,7 @@ bpmp::Simulator::Simulator() : nh_("~") {
 
     obstacle_state_list_publisher_ = nh_.advertise<bpmp_tracker::ObjectStateList>("obstacle_state_list", 1);
     target_state_publisher_ = nh_.advertise<bpmp_tracker::ObjectState>("target_state", 1);
-    tracker_state_publisher_ = nh_.advertise<bpmp_tracker::ObjectState>("tracker_state_list", 1);
+    tracker_state_publisher_ = nh_.advertise<bpmp_tracker::UnicycleState>("tracker_state", 1);
 
     pcl_publisher_ = nh_.advertise<pcl::PointCloud<pcl::PointXYZ>>("point_cloud_obstacle", 1);
     pcl_boxes_vis_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("pcl_boxes", 1);
@@ -92,6 +92,9 @@ bpmp::Simulator::Simulator() : nh_("~") {
 
     control_input_subscriber_ = nh_.subscribe("/bpmp_tracker/tracker_control_input", 1,
                                               &Simulator::control_input_callback, this);
+    unicycle_control_input_subscriber_ = nh_.subscribe("/bpmp_tracker/unicycle_control_input", 1,
+                                              &Simulator::unicycle_input_callback, this);
+
     ReadInitialTrackerStateList();
     ReadObjectTrajectory();
     if (is_unstructured_)
@@ -180,9 +183,9 @@ void bpmp::Simulator::ReadInitialTrackerStateList() {
     std::ifstream initial_state_file;
     initial_state_file.open(initial_state_file_name_.c_str());
     if (initial_state_file.is_open())
-        initial_state_file>>current_unicycle_state_.px >>current_unicycle_state_.py >>current_unicycle_state_.theta;
+        initial_state_file>>current_unicycle_state_.px >>current_unicycle_state_.py >> current_unicycle_state_.pz >>current_unicycle_state_.theta;
     else{
-        current_unicycle_state_.px = 0.0, current_unicycle_state_.py = 0.0, current_unicycle_state_.theta = 0.0;
+        current_unicycle_state_.px = 0.0, current_unicycle_state_.py = 0.0, current_unicycle_state_.pz = 1.0, current_unicycle_state_.theta = 0.0;
     }
     initial_state_file.close();
     unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
@@ -207,11 +210,17 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
     // Tracker Visualization (Nav_msgs in Unicycle Simulator)
     tracker_vis_.pose.pose.position.x = current_unicycle_state_.px;
     tracker_vis_.pose.pose.position.y = current_unicycle_state_.py;
-    tracker_vis_.pose.pose.position.z = 0.0;
+    tracker_vis_.pose.pose.position.z = 0.5;
     tracker_vis_.pose.pose.orientation.x = 0.0;
     tracker_vis_.pose.pose.orientation.y = 0.0;
     tracker_vis_.pose.pose.orientation.z = sin(0.5*current_unicycle_state_.theta);
     tracker_vis_.pose.pose.orientation.w = cos(0.5*current_unicycle_state_.theta);
+    // Tracker tf Publish
+    tf::Transform transform;
+    transform.setOrigin(tf::Vector3(tracker_vis_.pose.pose.position.x,tracker_vis_.pose.pose.position.y,tracker_vis_.pose.pose.position.z));
+    tf::Quaternion q(tracker_vis_.pose.pose.orientation.x,tracker_vis_.pose.pose.orientation.y,tracker_vis_.pose.pose.orientation.z,tracker_vis_.pose.pose.orientation.w);
+    transform.setRotation(q);
+    br_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "current"));
     // target_state
     target_state_msg_.px = current_target_state_.px;
     target_state_msg_.py = current_target_state_.py;
@@ -231,12 +240,10 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
         object_state_temp.vz = current_obstacle_state_list_[i].vz;
         obstacle_state_list_msg_.object_state_list.push_back(object_state_temp);
     }
-    tracker_state_msg_.px = current_target_state_.px;
-    tracker_state_msg_.py = current_target_state_.py;
-    tracker_state_msg_.pz = current_target_state_.pz;
-    tracker_state_msg_.vx = current_target_state_.px;
-    tracker_state_msg_.vy = current_target_state_.py;
-    tracker_state_msg_.vz = current_target_state_.pz;
+    tracker_state_msg_.px = current_unicycle_state_.px;
+    tracker_state_msg_.py = current_unicycle_state_.py;
+    tracker_state_msg_.pz = current_unicycle_state_.pz;
+    tracker_state_msg_.theta = current_unicycle_state_.theta;
 }
 
 void bpmp::Simulator::PublishRosMsgs() {
@@ -360,4 +367,9 @@ void bpmp::Simulator::ReadObstacleConfiguration() {
         }
     }
     obstacle_file.close();
+}
+
+void bpmp::Simulator::unicycle_input_callback(const bpmp_tracker::UnicycleInput &msg) {
+    unicycle_control_input_.linear_speed = msg.vel_linear;
+    unicycle_control_input_.angular_speed = msg.vel_angular;
 }

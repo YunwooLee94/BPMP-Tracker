@@ -6,11 +6,11 @@
 #include <bpmp_utils/eigenmvn.h>
 #include <bpmp_tracker/ObjectState.h>
 #include <bpmp_tracker/ObjectStateList.h>
+#include <bpmp_tracker/PolyState.h>
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <decomp_util/seed_decomp.h>
 #include <decomp_ros_utils/data_ros_utils.h>
-
 
 namespace bpmp{
     struct PredictonParam{
@@ -40,9 +40,10 @@ namespace bpmp{
         ros::Publisher raw_primitive_publisher_;
         ros::Publisher feasible_primitive_publisher_;
         ros::Publisher best_primitive_publisher_;
-
         ros::Publisher prediction_result_publisher_;
 
+        double t0_{ros::Time::now().toSec()};
+        double GetCurrentTime(){return ros::Time::now().toSec()-t0_;};
         void TargetStateCallback(const bpmp_tracker::ObjectState &msg);
         void PclCallback(const sensor_msgs::PointCloud2::ConstPtr &pcl_msgs);
 
