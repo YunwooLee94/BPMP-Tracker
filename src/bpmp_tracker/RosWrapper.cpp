@@ -278,8 +278,9 @@ void bpmp::RosWrapper::PclCallback(const sensor_msgs::PointCloud2_<std::allocato
         sensor_msgs::convertPointCloud2ToPointCloud(*pcl_msgs, pcl);
         pcl.header.frame_id = pcl_msgs->header.frame_id;
         pcl.header.stamp = pcl_msgs->header.stamp;
+        vec_Vec3f  obst = DecompROS::cloud_to_vec(pcl);
         p_base_->mutex_set_[0].lock();
-        p_base_->point_cloud_3d_ = DecompROS::cloud_to_vec(pcl);
+        p_base_->point_cloud_3d_ = obst;
         p_base_->is_obstacle_info_ = true;
         p_base_->mutex_set_[0].unlock();
     }

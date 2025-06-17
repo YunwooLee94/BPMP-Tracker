@@ -204,6 +204,7 @@ void bpmp::Tracker::GeneratePrimitiveThread(const double &t, const int &start_id
         is_simple_mode = true;
     double qx = target_trajectory_.ctrl_x[3]-target_trajectory_.ctrl_x[2];
     double qy = target_trajectory_.ctrl_y[3]-target_trajectory_.ctrl_y[2];
+
     double denom_inv = 1.0/(4*qx*qx+3*qy*qy);
     for (int i = start_idx; i < end_idx; i++) {
         if (is_simple_mode){
@@ -732,44 +733,67 @@ void bpmp::Tracker::GetBestIndexThread(const int &start_idx, const int &end_idx,
     double acc_coeff_x[2];
     double acc_coeff_y[2];
     double min_acc = 99999999.0;
-    uint min_acc_idx = -1;
+
     double T = param_.horizon;
     double acc_coeff = 6.0 / pow(T, 2);
     double acc_squared_sum;
-    for (int idx = start_idx; idx < end_idx; idx++) {
-        acc_coeff_x[0] = acc_coeff * (primitive_[dynamically_feasible_index_[idx]].ctrl_x[2] -
-                                      2.0 *
-                                      primitive_[dynamically_feasible_index_[idx]].ctrl_x[1]
-                                      +
-                                      primitive_[dynamically_feasible_index_[idx]].ctrl_x[0]);
-        acc_coeff_x[1] = acc_coeff * (primitive_[dynamically_feasible_index_[idx]].ctrl_x[3] -
-                                      2.0 *
-                                      primitive_[dynamically_feasible_index_[idx]].ctrl_x[2]
-                                      +
-                                      primitive_[dynamically_feasible_index_[idx]].ctrl_x[1]);
-        acc_coeff_y[0] = acc_coeff * (primitive_[dynamically_feasible_index_[idx]].ctrl_y[2] -
-                                      2.0 *
-                                      primitive_[dynamically_feasible_index_[idx]].ctrl_y[1]
-                                      +
-                                      primitive_[dynamically_feasible_index_[idx]].ctrl_y[0]);
-        acc_coeff_y[1] = acc_coeff * (primitive_[dynamically_feasible_index_[idx]].ctrl_y[3] -
-                                      2.0 *
-                                      primitive_[dynamically_feasible_index_[idx]].ctrl_y[2]
-                                      +
-                                      primitive_[dynamically_feasible_index_[idx]].ctrl_y[1]);
-        acc_squared_sum = 0.0;
-        for (int j = 0; j <= 2; j++) {
-            for (int k = std::max(0, j - 1); k <= std::min(1, j); k++) {
-                acc_squared_sum +=
-                        double(bpmp::nchooser(1, k)) * double(bpmp::nchooser(1, j - k)) / double(bpmp::nchooser(2, j)) *
-                        (acc_coeff_x[k] * acc_coeff_x[j - k] + acc_coeff_y[k] * acc_coeff_y[j - k]);
-            }
-        }
-        if (acc_squared_sum < min_acc) {
+    uint min_acc_idx = -1;
+    double heading_angle[2];
+    double los_angle[2];
+    double heading_mag, los_mag;
+    for(int idx = start_idx;idx<end_idx;idx++){
+        heading_angle[0] = primitive_[dynamically_feasible_index_[idx]].ctrl_x[3]-primitive_[dynamically_feasible_index_[idx]].ctrl_x[2];
+        heading_angle[1] = primitive_[dynamically_feasible_index_[idx]].ctrl_y[3]-primitive_[dynamically_feasible_index_[idx]].ctrl_y[2];
+        los_angle[0] = target_trajectory_.ctrl_x[3]-primitive_[dynamically_feasible_index_[idx]].ctrl_x[3];
+        los_angle[1] = target_trajectory_.ctrl_y[3]-primitive_[dynamically_feasible_index_[idx]].ctrl_y[3];
+        heading_mag = sqrt(pow(heading_angle[0],2)+pow(heading_angle[1],2));
+        los_mag = sqrt(pow(los_angle[0],2)+pow(los_angle[1],2));
+        if(heading_mag<1e-4)
+            continue;
+        heading_angle[0] = heading_angle[0] /heading_mag;
+        heading_angle[1] = heading_angle[1] /heading_mag;
+        los_angle[0] = los_angle[0]/los_mag;
+        los_angle[1] = los_angle[1]/los_mag;
+        acc_squared_sum = -(heading_angle[0]*los_angle[0]+heading_angle[1]*los_angle[1]);
+        if(acc_squared_sum<min_acc){
             min_acc_idx = dynamically_feasible_index_[idx];
             min_acc = acc_squared_sum;
         }
     }
+//    for (int idx = start_idx; idx < end_idx; idx++) {
+//        acc_coeff_x[0] = acc_coeff * (primitive_[dynamically_feasible_index_[idx]].ctrl_x[2] -
+//                                      2.0 *
+//                                      primitive_[dynamically_feasible_index_[idx]].ctrl_x[1]
+//                                      +
+//                                      primitive_[dynamically_feasible_index_[idx]].ctrl_x[0]);
+//        acc_coeff_x[1] = acc_coeff * (primitive_[dynamically_feasible_index_[idx]].ctrl_x[3] -
+//                                      2.0 *
+//                                      primitive_[dynamically_feasible_index_[idx]].ctrl_x[2]
+//                                      +
+//                                      primitive_[dynamically_feasible_index_[idx]].ctrl_x[1]);
+//        acc_coeff_y[0] = acc_coeff * (primitive_[dynamically_feasible_index_[idx]].ctrl_y[2] -
+//                                      2.0 *
+//                                      primitive_[dynamically_feasible_index_[idx]].ctrl_y[1]
+//                                      +
+//                                      primitive_[dynamically_feasible_index_[idx]].ctrl_y[0]);
+//        acc_coeff_y[1] = acc_coeff * (primitive_[dynamically_feasible_index_[idx]].ctrl_y[3] -
+//                                      2.0 *
+//                                      primitive_[dynamically_feasible_index_[idx]].ctrl_y[2]
+//                                      +
+//                                      primitive_[dynamically_feasible_index_[idx]].ctrl_y[1]);
+//        acc_squared_sum = 0.0;
+//        for (int j = 0; j <= 2; j++) {
+//            for (int k = std::max(0, j - 1); k <= std::min(1, j); k++) {
+//                acc_squared_sum +=
+//                        double(bpmp::nchooser(1, k)) * double(bpmp::nchooser(1, j - k)) / double(bpmp::nchooser(2, j)) *
+//                        (acc_coeff_x[k] * acc_coeff_x[j - k] + acc_coeff_y[k] * acc_coeff_y[j - k]);
+//            }
+//        }
+//        if (acc_squared_sum < min_acc) {
+//            min_acc_idx = dynamically_feasible_index_[idx];
+//            min_acc = acc_squared_sum;
+//        }
+//    }
     score_pair.second = min_acc;
     score_pair.first = min_acc_idx;
 }
