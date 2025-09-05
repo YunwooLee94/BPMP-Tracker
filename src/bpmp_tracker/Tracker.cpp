@@ -32,6 +32,7 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
             default:{
                 cout<<"CheckModeERROR"<<endl;
                 return false;
+
             }
         }
     }
