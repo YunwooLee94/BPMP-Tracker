@@ -105,6 +105,7 @@ void bpmp::RosWrapper::ObstacleStateListCallback(const bpmp_tracker::ObjectState
         p_base_->current_obstacle_list_read_.push_back(obstacle_state);
     }
     p_base_->is_obstacle_info_ = true;
+    p_base_->is_dynobs_received_ = true;
     p_base_->mutex_set_[0].unlock();
 }
 void bpmp::RosWrapper::TrackerStateCallback(const nav_msgs::Odometry::ConstPtr &msg) {
@@ -203,6 +204,8 @@ bpmp::RosWrapper::RosWrapper(std::shared_ptr<bpmp::PlannerBase> p_base) : p_base
     nh_.param<double>("distance_max", planning_param_.distance_max, 1.0);
     nh_.param<bool>("is_experiment", planning_param_.is_experiment, false);
     nh_.param<bool>("is_unstructured",planning_param_.is_unstructured, false);
+    nh_.param<int>("check_mode",planning_param_.check_mode,0);
+    nh_.param<int>("sample_mode",planning_param_.sample_mode,0);
 
     nh_.param<double>("axis_limit/min_x", planning_param_.axis_limit.min_x, 0.0);
     nh_.param<double>("axis_limit/min_y", planning_param_.axis_limit.min_y, 0.0);
@@ -282,11 +285,13 @@ void bpmp::RosWrapper::PclCallback(const sensor_msgs::PointCloud2_<std::allocato
         p_base_->mutex_set_[0].lock();
         p_base_->point_cloud_3d_ = obst;
         p_base_->is_obstacle_info_ = true;
+        p_base_->is_pcl_received_ = true;
         p_base_->mutex_set_[0].unlock();
     }
     else{
         p_base_->mutex_set_[0].lock();
         p_base_->is_obstacle_info_ = false;
+        p_base_->is_pcl_received_ = false;
         p_base_->mutex_set_[0].unlock();
     }
 }

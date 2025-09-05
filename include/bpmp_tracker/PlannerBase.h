@@ -31,6 +31,8 @@ namespace bpmp{
         double terminal_weight{0.0};
         double distance_max{10.0};
         bool is_experiment{false};
+        int check_mode{0};
+        int sample_mode{0};
         struct{
             double min_x{0.0};
             double min_y{0.0};
@@ -58,6 +60,8 @@ namespace bpmp{
         bool is_tracker_info_{false};
         bool is_target_info_{false};
         bool is_obstacle_info_{false};
+        bool is_pcl_received_{false};
+        bool is_dynobs_received_{false};
 
         bool success_flag_{false};
 

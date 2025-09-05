@@ -12,6 +12,7 @@ namespace bpmp{
 
         shared_ptr <PlannerBase> p_base_;
         bool Plan(const double &t_trigger);
+        int EnvironmentMode();
         void UpdateResultToBase(const bool& is_success);
     private:
         TrackingParam param_;
@@ -45,10 +46,14 @@ namespace bpmp{
         void GeneratePrimitiveThread(const double &t, const int &start_idx, const int &end_idx, vector<bpmp::PrimitivePlanning> & primitive_list_sub);
         void GetFOVIndex();
         void GetFOVIndexThread(const int &start_idx, const int &end_idx, vector<bpmp::uint> &visible_idx_sub);
-        void GetSafeIndex();
+        vector<bpmp::uint> GetSafeIndexUnstructured(const vector<bpmp::uint> &index);
+        void GetSafeIndexUnstructuredThread(const std::vector<uint> &prior_idx, const int &start_idx, const int &end_idx, vector<bpmp::uint> &safe_idx_sub);
+        vector<bpmp::uint> GetSafeIndexDynamic(const vector<bpmp::uint> &index);
+        void GetSafeIndexDynamicThread(const std::vector<uint> &prior_idx,const int &start_idx, const int &end_idx, vector<bpmp::uint> &safe_idx_sub);
+
         void GetSafeIndexThread(const int &start_idx, const int &end_idx, vector<bpmp::uint> &safe_idx_sub);
         void GenerateCorridor();
-        void GetSafeIndexUnstructuredThread(const int &start_idx, const int &end_idx, vector<bpmp::uint> &safe_idx_sub);
+
         void GetDynamicallyFeasibleIndex();
         void GetDynamicallyFeasibleIndexThread(const int &start_idx, const int &end_idx, vector<bpmp::uint> &dyn_feas_idx_sub);
 

@@ -15,11 +15,28 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
     if(visible_index_.empty())
         pass_test0 = false;
     if(pass_test0){
-        GetSafeIndex(); // Target Distance + Collision and Occlusion Avoidance against Obstacles
+        switch (EnvironmentMode()){
+            case 0:{
+                safe_index_ = GetSafeIndexUnstructured(visible_index_); // Target Distance + Collision and Occlusion Avoidance against Obstacles
+                break;
+            }
+            case 1:{
+                safe_index_ = GetSafeIndexDynamic(visible_index_);
+                break;
+            }
+            case 2:{
+                std::vector<uint> temp_safe_index = GetSafeIndexUnstructured(visible_index_);
+                safe_index_ = GetSafeIndexDynamic(temp_safe_index);
+                break;
+            }
+            default:{
+                cout<<"CheckModeERROR"<<endl;
+                return false;
+            }
+        }
     }
     else
         return false;
-
     bool pass_test1 = true;
     if(safe_index_.empty()){
         pass_test1 = false;
@@ -205,9 +222,13 @@ void bpmp::Tracker::GeneratePrimitiveThread(const double &t, const int &start_id
     double qx = target_trajectory_.ctrl_x[3]-target_trajectory_.ctrl_x[2];
     double qy = target_trajectory_.ctrl_y[3]-target_trajectory_.ctrl_y[2];
 
-    double denom_inv = 1.0/(4*qx*qx+3*qy*qy);
+    double denom_inv_a = 1.0/(4*qx*qx+3*qy*qy);
+    double denom_inv = 1.0/(3*qx*qx+4*qy*qy);
+    double coeff1 = qx*qx+2*qy*qy;
+    double coeff2 = qx*qy;
+    double coeff3 = 3*qx*qx+2*qy*qy;
     for (int i = start_idx; i < end_idx; i++) {
-        if (is_simple_mode){
+        if (is_simple_mode or param_.sample_mode==1){
             // x-coeff
             temp_primitive.ctrl_x[0] = 0.0;
             temp_primitive.ctrl_x[1] = 0.33333333*end_points_[i].x;
@@ -224,26 +245,25 @@ void bpmp::Tracker::GeneratePrimitiveThread(const double &t, const int &start_id
             temp_primitive.ctrl_z[2] = 0.0;
             temp_primitive.ctrl_z[3] = 0.0;
         }
-        else{
+        else if (param_.sample_mode==0){
             temp_primitive.ctrl_x[0] = 0.0;
-            temp_primitive.ctrl_x[1] = (end_points_[i].x*(qx*qx+2*qy*qy)-qx*qy*end_points_[i].y)/(3*qx*qx+4*qy*qy);
-            temp_primitive.ctrl_x[2] = (2*end_points_[i].x*(qx*qx+2*qy*qy)-2*end_points_[i].y*qx*qy)/(3*qx*qx+4*qy*qy);
+            temp_primitive.ctrl_x[1] = (end_points_[i].x*coeff1-coeff2*end_points_[i].y)*denom_inv;
+            temp_primitive.ctrl_x[2] = 2*temp_primitive.ctrl_x[1];
             temp_primitive.ctrl_x[3] = end_points_[i].x;
 
             temp_primitive.ctrl_y[0] = 0.0;
             temp_primitive.ctrl_y[1] = 0.0;
-            temp_primitive.ctrl_y[2] = (end_points_[i].y*(3*qx*qx+2*qy*qy)-end_points_[i].x*qx*qy)/(3*qx*qx+4*qy*qy);
+            temp_primitive.ctrl_y[2] = (end_points_[i].y*coeff3-end_points_[i].x*coeff2)*denom_inv;
             temp_primitive.ctrl_y[3] = end_points_[i].y;
 //            temp_primitive.ctrl_x[0] = 0.0;
-//            temp_primitive.ctrl_x[1] = (end_points_[i].x*(2*qx*qx+qy*qy)+qx*qy*end_points_[i].y)*denom_inv;
-//            temp_primitive.ctrl_x[2] = (2*end_points_[i].x*(2*qx*qx+qy*qy)+2*end_points_[i].y*qx*qy)*denom_inv;
+//            temp_primitive.ctrl_x[1] = (end_points_[i].x*(2*qx*qx+qy*qy)+qx*qy*end_points_[i].y)*denom_inv_a;
+//            temp_primitive.ctrl_x[2] = (2*end_points_[i].x*(2*qx*qx+qy*qy)+2*end_points_[i].y*qx*qy)*denom_inv_a;
 //            temp_primitive.ctrl_x[3] = end_points_[i].x;
 //
 //            temp_primitive.ctrl_y[0] = 0.0;
 //            temp_primitive.ctrl_y[1] = 0.0;
-//            temp_primitive.ctrl_y[2] = (end_points_[i].y*(2*qx*qx+3*qy*qy)+end_points_[i].x*qy*qx)*denom_inv;
+//            temp_primitive.ctrl_y[2] = (end_points_[i].y*(2*qx*qx+3*qy*qy)+end_points_[i].x*qy*qx)*denom_inv_a;
 //            temp_primitive.ctrl_y[3] = end_points_[i].y;
-
             temp_primitive.ctrl_z[0] = 0.0;
             temp_primitive.ctrl_z[1] = 0.0;
             temp_primitive.ctrl_z[2] = 0.0;
@@ -444,36 +464,50 @@ void bpmp::Tracker::GetDynamicallyFeasibleIndexThread(const int &start_idx, cons
             dyn_feas_idx_sub.push_back(safe_index_[idx]);
     }
 }
-void bpmp::Tracker::GetSafeIndex() {
-    safe_index_.clear();
-    if (param_.is_unstructured){
-        GenerateCorridor();
-        if(polys_.empty())
-            return;
-    }
-    int num_chunk = visible_index_.size() / param_.num_thread;
+
+std::vector<uint> bpmp::Tracker::GetSafeIndexDynamic(const std::vector<uint> &index) {
+    vector<bpmp::uint> feasible_index;
+    int num_chunk = index.size()/param_.num_thread;
     vector<thread> worker_thread;
     vector<vector<bpmp::uint>> safe_index_temp(param_.num_thread);
-    if (param_.is_unstructured) {
-        for (int j = 0; j < param_.num_thread; j++)
-            worker_thread.emplace_back(
-                    thread(&Tracker::GetSafeIndexUnstructuredThread, this, num_chunk * j, num_chunk * (j + 1),
-                           std::ref(safe_index_temp[j])));
-    } else {
-        for (int j = 0; j < param_.num_thread; j++)
-            worker_thread.emplace_back(
-                    thread(&Tracker::GetSafeIndexThread, this,  num_chunk * j, num_chunk * (j + 1),
-                           std::ref(safe_index_temp[j])));
-    }
+    for (int j = 0; j < param_.num_thread; j++)
+        worker_thread.emplace_back(
+                thread(&Tracker::GetSafeIndexDynamicThread, this, index, num_chunk * j, num_chunk * (j + 1),
+                       std::ref(safe_index_temp[j])));
     for (int j = 0; j < param_.num_thread; j++)
         worker_thread[j].join();
     for (int j = 0; j < param_.num_thread; j++) {
         for (int k = 0; k < safe_index_temp[j].size(); k++)
-            safe_index_.push_back(safe_index_temp[j][k]);
+            feasible_index.push_back(safe_index_temp[j][k]);
     }
+    return feasible_index;
+}
+std::vector<bpmp::uint> bpmp::Tracker::GetSafeIndexUnstructured(const vector<bpmp::uint> &index) {
+    vector<bpmp::uint> feasible_index;
+    // Generate Corridor
+    GenerateCorridor();
+    if(polys_.empty())
+        return feasible_index;
+    // SafeIndexUnstructured
+    int num_chunk = index.size() / param_.num_thread;
+    vector<thread> worker_thread;
+    vector<vector<bpmp::uint>> safe_index_temp(param_.num_thread);
+
+    for (int j = 0; j < param_.num_thread; j++)
+        worker_thread.emplace_back(
+                thread(&Tracker::GetSafeIndexUnstructuredThread, this, index, num_chunk * j, num_chunk * (j + 1),
+                       std::ref(safe_index_temp[j])));
+
+    for (int j = 0; j < param_.num_thread; j++)
+        worker_thread[j].join();
+    for (int j = 0; j < param_.num_thread; j++) {
+        for (int k = 0; k < safe_index_temp[j].size(); k++)
+            feasible_index.push_back(safe_index_temp[j][k]);
+    }
+    return feasible_index;
 }
 
-void bpmp::Tracker::GetSafeIndexUnstructuredThread(const int &start_idx, const int &end_idx,
+void bpmp::Tracker::GetSafeIndexUnstructuredThread(const std::vector<uint> &prior_idx, const int &start_idx, const int &end_idx,
                                                    std::vector<uint> &safe_idx_sub) {
     Eigen::Vector3d A_comp_temp{0.0, 0.0, 0.0};
     double b_comp_temp(0.0);
@@ -502,9 +536,9 @@ void bpmp::Tracker::GetSafeIndexUnstructuredThread(const int &start_idx, const i
         // SFC Constraint
         for (int i = 0; i < LinearConstraintA.size(); i++) {
             for (int j = 0; j < 4; j++) {
-                value_sfc = LinearConstraintA[i][0] * (primitive_[visible_index_[idx]].ctrl_x[j]) +
-                            LinearConstraintA[i][1] * (primitive_[visible_index_[idx]].ctrl_y[j]) +
-                            LinearConstraintA[i][2] * (primitive_[visible_index_[idx]].ctrl_z[j])+
+                value_sfc = LinearConstraintA[i][0] * (primitive_[prior_idx[idx]].ctrl_x[j]) +
+                            LinearConstraintA[i][1] * (primitive_[prior_idx[idx]].ctrl_y[j]) +
+                            LinearConstraintA[i][2] * (primitive_[prior_idx[idx]].ctrl_z[j])+
                             - LinearConstraintb[i] + param_.object_radius + param_.safe_distance;
                 if (value_sfc > 0.0) {
                     flag_store_in1 = false;
@@ -520,8 +554,8 @@ void bpmp::Tracker::GetSafeIndexUnstructuredThread(const int &start_idx, const i
         if (flag_store_out1) {
             flag_store_in2 = true;
             for (int i = 0; i < 4; i++) {
-                relative_target_pos_x[i] = primitive_[visible_index_[idx]].ctrl_x[i] - target_trajectory_.ctrl_x[i];
-                relative_target_pos_y[i] = primitive_[visible_index_[idx]].ctrl_y[i] - target_trajectory_.ctrl_y[i];
+                relative_target_pos_x[i] = primitive_[prior_idx[idx]].ctrl_x[i] - target_trajectory_.ctrl_x[i];
+                relative_target_pos_y[i] = primitive_[prior_idx[idx]].ctrl_y[i] - target_trajectory_.ctrl_y[i];
             }
             for (int j = 0; j <= 6; j++) {
                 value_distance = 0.0;
@@ -544,102 +578,7 @@ void bpmp::Tracker::GetSafeIndexUnstructuredThread(const int &start_idx, const i
 }
 void bpmp::Tracker::GetSafeIndexThread(const int &start_idx, const int &end_idx,
                                        std::vector<uint> &safe_idx_sub) {
-    bool flag_store_in1 = true; // collision between obstacle and tracker
-    bool flag_store_in2 = true; // occlusion of targets
-    bool flag_store_in3 = true; // distance between tracker and target
-    bool flag_store_out = true;
-    double value;
-    double relative_obstacle_pos_x[4], relative_obstacle_pos_y[4]; //drone-obstacle
-    double relative_target_obstacle_pos_x[4], relative_target_obstacle_pos_y[4]; //target-obstacle
-    double relative_target_pos_x[4], relative_target_pos_y[4]; //drone-target
-    double object_radius_squared = param_.object_radius * param_.object_radius;
-    double safe_distance_squared = pow(param_.safe_distance + 2 * param_.object_radius, 2);
-    double distance_max_squared = pow(param_.distance_max, 2);
-    for (int idx = start_idx; idx < end_idx; idx++) {
-        flag_store_in1 = true;
-        flag_store_in2 = true;
-        flag_store_out = true;
-        flag_store_in3 = true;
-        for (int j = 0; j < 4; j++) {
-            relative_target_pos_x[j] = primitive_[idx].ctrl_x[j] - target_trajectory_.ctrl_x[j];
-            relative_target_pos_y[j] = primitive_[idx].ctrl_y[j] - target_trajectory_.ctrl_y[j];
-        }
-        if (obstacle_primitive_list_.empty())
-            goto target_distance_check;
-        for (int i = 0; i < obstacle_primitive_list_.size(); i++) {
-            flag_store_out = true;
-            for (int j = 0; j < 4; j++) {
-                relative_obstacle_pos_x[j] =
-                        primitive_[idx].ctrl_x[j] - obstacle_primitive_list_[i].ctrl_x[j];
-                relative_obstacle_pos_y[j] =
-                        primitive_[idx].ctrl_y[j] - obstacle_primitive_list_[i].ctrl_y[j];
-                relative_target_obstacle_pos_x[j] =
-                        target_trajectory_.ctrl_x[j] - obstacle_primitive_list_[i].ctrl_x[j];
-                relative_target_obstacle_pos_y[j] =
-                        target_trajectory_.ctrl_y[j] - obstacle_primitive_list_[i].ctrl_y[j];
-            }
-            for (int j = 0; j <= 6; j++) {  // Collision between obstacle and tracker
-                flag_store_in1 = true;
-                value = 0.0f;
-                for (int k = std::max(0, j - 3); k <= std::min(3, j); k++) {
-                    value += (double) nchooser(3, k) * (double) nchooser(3, j - k) /
-                             (double) nchooser(6, j) *
-                             (relative_obstacle_pos_x[k] * relative_obstacle_pos_x[j - k] +
-                              relative_obstacle_pos_y[k] * relative_obstacle_pos_y[j - k]
-                             );
-                }
-                if (value < safe_distance_squared) {
-                    flag_store_in1 = false;
-                    break;
-                }
-            }
-            if (not flag_store_in1) {
-                flag_store_out = false;
-                break;
-            }
-            for (int j = 0; j <= 6; j++) {
-                flag_store_in2 = true;
-                value = 0.0f;
-                for (int k = std::max(0, j - 3); k <= std::min(3, j); k++) {
-                    value += (double) nchooser(3, k) * (double) nchooser(3, j - k) /
-                             (double) nchooser(6, j) *
-                             (relative_obstacle_pos_x[k] * relative_target_obstacle_pos_x[j - k] +
-                              relative_obstacle_pos_y[k] * relative_target_obstacle_pos_y[j - k]
-                             );
-                }
-                if (value + 2*object_radius_squared<0) {
-                    flag_store_in2 = false;
-                    break;
-                }
-            }
-            if (not flag_store_in2) {
-                flag_store_out = false;
-                break;
-            }
-        }
-        target_distance_check:
-        {
-            if (flag_store_in1 and flag_store_in2 and flag_store_out) {
-                flag_store_in3 = true;
-                for (int j = 0; j <= 6; j++) {
-                    value = 0.0f;
-                    for (int k = std::max(0, j - 3); k <= std::min(3, j); k++) {
-                        value += (double) nchooser(3, k) * (double) nchooser(3, j - k) /
-                                 (double) nchooser(6, j) *
-                                 (relative_target_pos_x[k] * relative_target_pos_x[j - k] +
-                                  relative_target_pos_y[k] * relative_target_pos_y[j - k]
-                                 );
-                    }
-                    if (value < safe_distance_squared or value > distance_max_squared) {
-                        flag_store_in3 = false;
-                        break;
-                    }
-                }
-            }
-        };
-        if (flag_store_out and flag_store_in3)
-            safe_idx_sub.push_back(idx);
-    }
+
 }
 
 
@@ -828,6 +767,145 @@ void bpmp::Tracker::GenerateCorridor() {
         corridor_constraints_=corridor_constraint;
     }
 }
+
+int bpmp::Tracker::EnvironmentMode() {
+    int mode = 0; // 0: unstructured static, 1: dynamic, 2: static+dynamic
+    p_base_->mutex_set_[0].lock();
+    if(p_base_->is_dynobs_received_)
+        mode = 1;
+    if(p_base_->is_pcl_received_ and p_base_->is_dynobs_received_)
+        mode = 2;
+    p_base_->mutex_set_[0].unlock();
+    return mode;
+}
+
+void
+bpmp::Tracker::GetSafeIndexDynamicThread(const std::vector<uint> &prior_idx, const int &start_idx, const int &end_idx,
+                                         std::vector<uint> &safe_idx_sub) {
+    bool flag_store_in1 = true; // collision between obstacle and tracker
+    bool flag_store_in2 = true; // occlusion of targets
+    bool flag_store_in3 = true; // distance between tracker and target
+    bool flag_store_out = true;
+    double value;
+    double relative_obstacle_pos_x[4], relative_obstacle_pos_y[4]; //drone-obstacle
+    double relative_target_obstacle_pos_x[4], relative_target_obstacle_pos_y[4]; //target-obstacle
+    double relative_target_pos_x[4], relative_target_pos_y[4]; //drone-target
+    double object_radius_squared = param_.object_radius * param_.object_radius;
+    double safe_distance_squared = pow(param_.safe_distance + 2 * param_.object_radius, 2);
+    double distance_max_squared = pow(param_.distance_max, 2);
+    for (int idx = start_idx; idx < end_idx; idx++) {
+        flag_store_in1 = true;
+        flag_store_in2 = true;
+        flag_store_out = true;
+        flag_store_in3 = true;
+        for (int j = 0; j < 4; j++) {
+            relative_target_pos_x[j] = primitive_[prior_idx[idx]].ctrl_x[j] - target_trajectory_.ctrl_x[j];
+            relative_target_pos_y[j] = primitive_[prior_idx[idx]].ctrl_y[j] - target_trajectory_.ctrl_y[j];
+        }
+        double min_value_drone_obstacle =1e8;
+        double min_value_target_obstacle =1e8;
+
+        for (int i = 0; i < obstacle_primitive_list_.size(); i++) {
+            flag_store_out = true;
+            for (int j = 0; j < 4; j++) {
+                relative_obstacle_pos_x[j] =
+                        primitive_[prior_idx[idx]].ctrl_x[j] - obstacle_primitive_list_[i].ctrl_x[j];
+                relative_obstacle_pos_y[j] =
+                        primitive_[prior_idx[idx]].ctrl_y[j] - obstacle_primitive_list_[i].ctrl_y[j];
+                relative_target_obstacle_pos_x[j] =
+                        target_trajectory_.ctrl_x[j] - obstacle_primitive_list_[i].ctrl_x[j];
+                relative_target_obstacle_pos_y[j] =
+                        target_trajectory_.ctrl_y[j] - obstacle_primitive_list_[i].ctrl_y[j];
+            }
+            min_value_drone_obstacle =1e8;
+            for (int j = 0; j <= 6; j++) {  // Collision between obstacle and tracker
+                flag_store_in1 = true;
+                value = 0.0f;
+                for (int k = std::max(0, j - 3); k <= std::min(3, j); k++) {
+                    value += (double) nchooser(3, k) * (double) nchooser(3, j - k) /
+                             (double) nchooser(6, j) *
+                             (relative_obstacle_pos_x[k] * relative_obstacle_pos_x[j - k] +
+                              relative_obstacle_pos_y[k] * relative_obstacle_pos_y[j - k]
+                             );
+                }
+                if (value < safe_distance_squared) {
+                    flag_store_in1 = false;
+                    break;
+                }
+                if (value<min_value_drone_obstacle)
+                    min_value_drone_obstacle = value;
+            }
+            if (not flag_store_in1) {
+                flag_store_out = false;
+                break;
+            }
+            min_value_drone_obstacle = std::max(0.0, min_value_drone_obstacle);
+            //
+            min_value_target_obstacle =1e8;
+            for (int j = 0;j<=6;j++){
+                value = 0.0;
+                for (int k=std::max(0,j-3);k<=std::min(3,j);k++){
+                    value += (double) nchooser(3,k) * (double) nchooser(3,j-k) / (double) nchooser(6,j)*
+                             (relative_target_obstacle_pos_x[k]*relative_target_obstacle_pos_x[j-k]+
+                              relative_target_obstacle_pos_y[k]*relative_target_obstacle_pos_y[j-k]);
+                }
+                if (value<min_value_target_obstacle)
+                    min_value_target_obstacle = value;
+            }
+            min_value_target_obstacle = std::max(0.0,min_value_target_obstacle);
+            for (int j = 0; j <= 6; j++) {
+                flag_store_in2 = true;
+                value = 0.0f;
+                for (int k = std::max(0, j - 3); k <= std::min(3, j); k++) {
+                    value += (double) nchooser(3, k) * (double) nchooser(3, j - k) /
+                             (double) nchooser(6, j) *
+                             (relative_obstacle_pos_x[k] * relative_target_obstacle_pos_x[j - k] +
+                              relative_obstacle_pos_y[k] * relative_target_obstacle_pos_y[j - k]
+                             );
+                }
+                if (param_.check_mode==0)
+                    if(value+2*object_radius_squared+std::min(min_value_drone_obstacle,min_value_target_obstacle)<0){
+                        flag_store_in2 = false;
+                        break;
+                    }
+                if (param_.check_mode==1)
+                    if(value+2*object_radius_squared<0){
+                        flag_store_in2 = false;
+                        break;
+                    }
+                if (param_.check_mode==2)
+                    if(value<object_radius_squared){
+                        flag_store_in2 = false;
+                        break;
+                    }
+            }
+            if (not flag_store_in2) {
+                flag_store_out = false;
+                break;
+            }
+        }
+        if (flag_store_in1 and flag_store_in2 and flag_store_out) {
+            flag_store_in3 = true;
+            for (int j = 0; j <= 6; j++) {
+                value = 0.0f;
+                for (int k = std::max(0, j - 3); k <= std::min(3, j); k++) {
+                    value += (double) nchooser(3, k) * (double) nchooser(3, j - k) /
+                             (double) nchooser(6, j) *
+                             (relative_target_pos_x[k] * relative_target_pos_x[j - k] +
+                              relative_target_pos_y[k] * relative_target_pos_y[j - k]
+                             );
+                }
+                if (value < safe_distance_squared or value > distance_max_squared) {
+                    flag_store_in3 = false;
+                    break;
+                }
+            }
+        }
+        if (flag_store_out and flag_store_in3)
+            safe_idx_sub.push_back(idx);
+    }
+}
+
 
 
 
