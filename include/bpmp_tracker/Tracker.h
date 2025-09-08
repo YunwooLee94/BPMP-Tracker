@@ -14,6 +14,7 @@ namespace bpmp{
         bool Plan(const double &t_trigger);
         int EnvironmentMode();
         void UpdateResultToBase(const bool& is_success);
+        bool IsTargetStatic();
     private:
         TrackingParam param_;
         vector<bpmp::PrimitivePlanning> primitive_;
@@ -40,7 +41,7 @@ namespace bpmp{
         void UpdateValue(const double &t);
         bool CheckInfoAvailable();
 
-        void SampleEndPoint();
+        bool SampleEndPoint();
         void SampleEndPointThread(const int & start_idx, const int & end_idx, vector<bpmp::Point>& endpoint_list_sub);
         void GeneratePrimitive(const double &t);
         void GeneratePrimitiveThread(const double &t, const int &start_idx, const int &end_idx, vector<bpmp::PrimitivePlanning> & primitive_list_sub);

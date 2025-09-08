@@ -37,7 +37,8 @@ void bpmp::RosWrapper::PublishRosMsgs() {
     }
     {   // BEST
         p_base_->mutex_set_[1].lock();
-        tracker_best_trajectory_publisher_.publish(
+        if(p_base_->success_flag_)
+            tracker_best_trajectory_publisher_.publish(
                 visualizer_->VisualizeBestPrimitive(p_base_->tracker_raw_primitives_, p_base_->tracker_best_index_));
         p_base_->mutex_set_[1].unlock();
     }
@@ -62,7 +63,6 @@ void bpmp::RosWrapper::PublishRosMsgs() {
         }
         p_base_->mutex_set_[1].unlock();
     }
-
 }
 
 bpmp::TrackingParam bpmp::RosWrapper::GetTrackingParam() {
@@ -258,7 +258,8 @@ bpmp::RosWrapper::GenerateControlInput(const std::vector<bpmp::PrimitivePlanning
                                     pow(bpmp::getBernsteinValue(vel_ctrl_y, time_t,primitive[best_index].t0, primitive[best_index].tf, 2),2));
     if(pos_ctrl_x[3]<0)
         tracker_input.vel_linear = -tracker_input.vel_linear;
-    if (abs(tracker_input.vel_linear)<1e-4){
+    if (abs(tracker_input.vel_linear)<1e-2){
+        tracker_input.vel_linear = 0.0;
         tracker_input.vel_angular = 0.0;
     }
     else{
@@ -268,6 +269,11 @@ bpmp::RosWrapper::GenerateControlInput(const std::vector<bpmp::PrimitivePlanning
                                            pow(bpmp::getBernsteinValue(vel_ctrl_y, time_t,primitive[best_index].t0, primitive[best_index].tf, 2),2);
         tracker_input.vel_angular = tracker_input_angular_num/tracker_input_angular_den;
     }
+    static bpmp_tracker::UnicycleInput previous_output = tracker_input;
+    tracker_input.vel_linear = 0.3*previous_output.vel_linear+0.7*tracker_input.vel_linear;
+    tracker_input.vel_angular = 0.3*previous_output.vel_angular+0.7*tracker_input.vel_angular;
+    tracker_input.vel_linear = min(2.0,max(-2.0,tracker_input.vel_linear));
+    tracker_input.vel_angular = min(3.141592,max(-3.141592,tracker_input.vel_angular));
     return tracker_input;
 }
 
@@ -287,6 +293,7 @@ void bpmp::RosWrapper::PclCallback(const sensor_msgs::PointCloud2_<std::allocato
         p_base_->is_obstacle_info_ = true;
         p_base_->is_pcl_received_ = true;
         p_base_->mutex_set_[0].unlock();
+        cout<<"GOT PCL FROM SIMULATOR"<<endl;
     }
     else{
         p_base_->mutex_set_[0].lock();
