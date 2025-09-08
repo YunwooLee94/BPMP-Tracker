@@ -8,23 +8,29 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
         UpdateValue(t_trigger);
     else
         return false;
-    SampleEndPoint();
+    if(not SampleEndPoint()){
+        return false;
+    }
     GeneratePrimitive(t_trigger);
     GetFOVIndex(); // Field-of-View Constraints
     bool pass_test0 = true;
-    if(visible_index_.empty())
+    if(visible_index_.empty()){
         pass_test0 = false;
+    }
     if(pass_test0){
         switch (EnvironmentMode()){
             case 0:{
+                safe_index_.clear();
                 safe_index_ = GetSafeIndexUnstructured(visible_index_); // Target Distance + Collision and Occlusion Avoidance against Obstacles
                 break;
             }
             case 1:{
+                safe_index_.clear();
                 safe_index_ = GetSafeIndexDynamic(visible_index_);
                 break;
             }
             case 2:{
+                safe_index_.clear();
                 std::vector<uint> temp_safe_index = GetSafeIndexUnstructured(visible_index_);
                 safe_index_ = GetSafeIndexDynamic(temp_safe_index);
                 break;
@@ -44,8 +50,9 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
     }
     if (pass_test1) {
         GetDynamicallyFeasibleIndex();
-    } else
+    } else{
         return false;
+    }
 
     bool pass_test2 = true;
     if (dynamically_feasible_index_.empty()) {
@@ -53,8 +60,9 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
     }
     if (pass_test2) {
         GetBestIndex();
-    } else
+    } else{
         return false;
+    }
     return pass_test2;
 }
 
@@ -120,24 +128,32 @@ void bpmp::Tracker::UpdateValue(const double &t) {
         p_base_->mutex_set_[0].unlock();
     }
     {
-        vec_Vec3f point_cloud_3d_temp;
+        bool pcl_received=false;
         p_base_->mutex_set_[0].lock();
-        point_cloud_3d_temp = p_base_->point_cloud_3d_;
+        if(p_base_->is_pcl_received_){
+            pcl_received = true;
+        }
         p_base_->mutex_set_[0].unlock();
-        Eigen::Vector3d pcl_pts_global;
-        Eigen::Vector3d pcl_pts_local;
-        Eigen::Matrix<decimal_t, 3, 1> pcl_pts_local_3d;
-        Eigen::Transform<double,3,Eigen::Affine> current_pose_mat_inverse = current_pose_mat_.inverse();
-        point_cloud_3d_.clear();
-        for(int i =0;i<point_cloud_3d_temp.size();i++){
-            pcl_pts_global[0] = point_cloud_3d_temp[i][0];
-            pcl_pts_global[1] = point_cloud_3d_temp[i][1];
-            pcl_pts_global[2] = point_cloud_3d_temp[i][2];
-            pcl_pts_local = current_pose_mat_inverse*pcl_pts_global;
-            pcl_pts_local_3d[0] = (float)pcl_pts_local[0];
-            pcl_pts_local_3d[1] = (float)pcl_pts_local[1];
-            pcl_pts_local_3d[2] = (float)pcl_pts_local[2];
-            point_cloud_3d_.push_back(pcl_pts_local_3d);
+        if(pcl_received){
+            vec_Vec3f point_cloud_3d_temp;
+            p_base_->mutex_set_[0].lock();
+            point_cloud_3d_temp = p_base_->point_cloud_3d_;
+            p_base_->mutex_set_[0].unlock();
+            Eigen::Vector3d pcl_pts_global;
+            Eigen::Vector3d pcl_pts_local;
+            Eigen::Matrix<decimal_t, 3, 1> pcl_pts_local_3d;
+            Eigen::Transform<double,3,Eigen::Affine> current_pose_mat_inverse = current_pose_mat_.inverse();
+            point_cloud_3d_.clear();
+            for(int i =0;i<point_cloud_3d_temp.size();i++){
+                pcl_pts_global[0] = point_cloud_3d_temp[i][0];
+                pcl_pts_global[1] = point_cloud_3d_temp[i][1];
+                pcl_pts_global[2] = point_cloud_3d_temp[i][2];
+                pcl_pts_local = current_pose_mat_inverse*pcl_pts_global;
+                pcl_pts_local_3d[0] = (float)pcl_pts_local[0];
+                pcl_pts_local_3d[1] = (float)pcl_pts_local[1];
+                pcl_pts_local_3d[2] = (float)pcl_pts_local[2];
+                point_cloud_3d_.push_back(pcl_pts_local_3d);
+            }
         }
     }
 }
@@ -149,7 +165,7 @@ bool bpmp::Tracker::CheckInfoAvailable() {
     return do_plan;
 }
 
-void bpmp::Tracker::SampleEndPoint() {
+bool bpmp::Tracker::SampleEndPoint() {
     end_points_.clear();
     int num_chunk = param_.num_sample_planning / param_.num_thread;
     vector<thread> worker_thread;
@@ -164,6 +180,10 @@ void bpmp::Tracker::SampleEndPoint() {
         for(int k =0;k<end_point_temp[j].size();k++)
             end_points_.push_back(end_point_temp[j][k]);
     }
+    if(end_points_.size()<param_.num_sample_planning)
+        return false;
+    else
+        return true;
 }
 
 void bpmp::Tracker::SampleEndPointThread(const int &start_idx, const int &end_idx,
@@ -174,23 +194,35 @@ void bpmp::Tracker::SampleEndPointThread(const int &start_idx, const int &end_id
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> r_dis(param_.r_min, param_.r_max);
     double center_angle;
-    if(abs(target_trajectory_.ctrl_x[3]-target_trajectory_.ctrl_x[2])<1e-4 and abs(target_trajectory_.ctrl_y[3]-target_trajectory_.ctrl_y[2])<1e-4 ){
-        center_angle = std::atan2(-target_trajectory_.ctrl_y[3],-target_trajectory_.ctrl_x[3]);
+    double qx = target_trajectory_.ctrl_x[3]-target_trajectory_.ctrl_x[2];
+    double qy = target_trajectory_.ctrl_y[3]-target_trajectory_.ctrl_y[2];
+    if(abs(qx)<1e-4 and abs(qy)<1e-4 ){
+        center_angle = std::atan2(target_trajectory_.ctrl_y[0],target_trajectory_.ctrl_x[0])+M_PI;
     } else{
-        center_angle = std::atan2(target_trajectory_.ctrl_y[2] - target_trajectory_.ctrl_y[3],
-                                  target_trajectory_.ctrl_x[2] - target_trajectory_.ctrl_x[3]);
+        center_angle = std::atan2(qy,qx)+M_PI;
+        if(qx*target_trajectory_.ctrl_x[0]+qy*target_trajectory_.ctrl_y[0]<0) // Closing Direction
+            center_angle = std::atan2(qy,qx);
     }
     double half_range = 0.5* param_.fov;
     std::uniform_real_distribution<> theta_dis(center_angle - half_range, center_angle + half_range);
     double r, theta;
     Point tempPoint{end_point_center.x, end_point_center.y, end_point_center.z};
+    bool flag = false;
     for (int i = start_idx; i < end_idx; i++) {
-        r = r_dis(gen);
-        theta = theta_dis(gen);
-        tempPoint.x = float(end_point_center.x + r * cos(theta));
-        tempPoint.y = float(end_point_center.y + r * sin(theta));
-        tempPoint.z = float(end_point_center.z);
-        endpoint_list_sub.push_back(tempPoint);
+        flag = false;
+        for(int j =0;j<100;j++){
+            r = r_dis(gen);
+            theta = theta_dis(gen);
+            tempPoint.x = float(end_point_center.x + r * cos(theta));
+            tempPoint.y = float(end_point_center.y + r * sin(theta));
+            tempPoint.z = float(end_point_center.z);
+            if(tempPoint.x*qx+2*tempPoint.y*qy>=0){
+                flag = true;
+                break;
+            }
+        }
+        if(flag)
+            endpoint_list_sub.push_back(tempPoint);
     }
 }
 
@@ -217,11 +249,14 @@ void bpmp::Tracker::GeneratePrimitiveThread(const double &t, const int &start_id
     bpmp::PrimitivePlanning temp_primitive;
     temp_primitive.t0 = t;
     temp_primitive.tf = t + param_.horizon;
-    bool is_simple_mode = false;
-    if(abs(target_trajectory_.ctrl_x[2]-target_trajectory_.ctrl_x[3])<1e-4 and abs(target_trajectory_.ctrl_y[2]-target_trajectory_.ctrl_y[3])<1e-4)
-        is_simple_mode = true;
     double qx = target_trajectory_.ctrl_x[3]-target_trajectory_.ctrl_x[2];
     double qy = target_trajectory_.ctrl_y[3]-target_trajectory_.ctrl_y[2];
+    bool is_target_static_mode = false;
+    if(abs(qx)<1e-4 and abs(qy)<1e-4){
+        is_target_static_mode = true;
+        qx = target_trajectory_.ctrl_x[0];
+        qy = target_trajectory_.ctrl_y[0];
+    }
 
     double denom_inv_a = 1.0/(4*qx*qx+3*qy*qy);
     double denom_inv = 1.0/(3*qx*qx+4*qy*qy);
@@ -229,7 +264,7 @@ void bpmp::Tracker::GeneratePrimitiveThread(const double &t, const int &start_id
     double coeff2 = qx*qy;
     double coeff3 = 3*qx*qx+2*qy*qy;
     for (int i = start_idx; i < end_idx; i++) {
-        if (is_simple_mode or param_.sample_mode==1){
+        if (param_.sample_mode==1){
             // x-coeff
             temp_primitive.ctrl_x[0] = 0.0;
             temp_primitive.ctrl_x[1] = 0.33333333*end_points_[i].x;
@@ -246,7 +281,7 @@ void bpmp::Tracker::GeneratePrimitiveThread(const double &t, const int &start_id
             temp_primitive.ctrl_z[2] = 0.0;
             temp_primitive.ctrl_z[3] = 0.0;
         }
-        else if (param_.sample_mode==0){
+        else{
             temp_primitive.ctrl_x[0] = 0.0;
             temp_primitive.ctrl_x[1] = (end_points_[i].x*coeff1-coeff2*end_points_[i].y)*denom_inv;
             temp_primitive.ctrl_x[2] = 2*temp_primitive.ctrl_x[1];
@@ -297,6 +332,7 @@ void bpmp::Tracker::GetFOVIndexThread(const int &start_idx, const int &end_idx, 
     double vel_squared_sum[5], rel_squared_sum[7];
     double value_num;
     double value_den;
+    double value;
     for (int idx = start_idx; idx < end_idx; idx++) {
         flag_store_fov = true;
         for (int i = 0;i<4;i++){
@@ -310,7 +346,6 @@ void bpmp::Tracker::GetFOVIndexThread(const int &start_idx, const int &end_idx, 
             vel_y[i] = 3.0 * T_inv *
                        (primitive_[idx].ctrl_y[i + 1] -
                         primitive_[idx].ctrl_y[i]);
-//            printf("START IDX: %d, VEL X Y %d th coefficient: %f, %f\n",start_idx,i,vel_x[i],vel_y[i]);
         }
         // rel_x_squared, rel_y_squared
         rel_x_squared[0] = rel_x[0]*rel_x[0];
@@ -357,9 +392,9 @@ void bpmp::Tracker::GetFOVIndexThread(const int &start_idx, const int &end_idx, 
         for (int j = 0; j <= 10; j++) {
             value_den = 0.0, value_num = 0.0;
             for (int k = std::max(0, j - 6); k <= std::min(4, j); k++) {
-                value_num += double(nchooser(4, k)) * nchooser(6, j-k) / double(nchooser(10, j))*
+                value_num += double(nchooser(4, k)) * double(nchooser(6, j-k)) / double(nchooser(10, j))*
                              (vel_x_squared[k]*rel_x_squared[j-k]+vel_y_squared[k]*rel_y_squared[j-k]+vel_2xy[k]*rel_xy[j-k]);
-                value_den += double(nchooser(4, k)) * nchooser(6, j-k) / double(nchooser(10, j))*
+                value_den += double(nchooser(4, k)) * double(nchooser(6, j-k)) / double(nchooser(10, j))*
                              (vel_squared_sum[k]*rel_squared_sum[j-k]);
             }
             if(value_num/value_den<pow(cos(0.5*param_.fov),2)){
@@ -367,9 +402,23 @@ void bpmp::Tracker::GetFOVIndexThread(const int &start_idx, const int &end_idx, 
                 break;
             }
         }
+        if(not flag_store_fov)
+            continue;
+        for (int j=0;j<=5;j++){
+            value = 0.0;
+            for(int k = std::max(0,j-3);k<=std::min(2,j);k++){
+                value += double(nchooser(2,k))*double(nchooser(3,j-k))/double(nchooser(5,j))*
+                        (vel_x[k]*rel_x[j-k]+vel_y[k]*rel_y[j-k]);
+            }
+            if(value<0.0){
+                flag_store_fov = false;
+                break;
+            }
+        }
         if(flag_store_fov)
             visible_idx_sub.push_back(idx);
     }
+
 }
 void bpmp::Tracker::GetDynamicallyFeasibleIndexThread(const int &start_idx, const int &end_idx,
                                                       std::vector<uint> &dyn_feas_idx_sub) {
@@ -628,7 +677,6 @@ void bpmp::Tracker::UpdateResultToBase(const bool &is_success) {
             p_base_->SetBestIndex(best_index_);
             p_base_->mutex_set_[1].unlock();
         }
-
         {
             p_base_->mutex_set_[1].lock();
             p_base_->SetCorridorVis(polys_);
@@ -640,7 +688,6 @@ void bpmp::Tracker::UpdateResultToBase(const bool &is_success) {
             p_base_->EraseTrackerPrimitives();
             p_base_->mutex_set_[1].unlock();
         }
-
         {   // Safe Index
             p_base_->mutex_set_[1].lock();
             p_base_->EraseFeasibleIndex();
@@ -650,6 +697,10 @@ void bpmp::Tracker::UpdateResultToBase(const bool &is_success) {
 }
 
 void bpmp::Tracker::GetBestIndex() {
+    if(dynamically_feasible_index_.size()<param_.num_thread){
+        best_index_ = dynamically_feasible_index_[0];
+        return;
+    }
     int num_chunk = dynamically_feasible_index_.size() / param_.num_thread;
     vector<thread> worker_thread;
     vector<std::pair<bpmp::uint, double>> best_index_temp(param_.num_thread);
@@ -905,6 +956,19 @@ bpmp::Tracker::GetSafeIndexDynamicThread(const std::vector<uint> &prior_idx, con
         if (flag_store_out and flag_store_in3)
             safe_idx_sub.push_back(idx);
     }
+}
+
+bool bpmp::Tracker::IsTargetStatic() {
+    bool static_x = abs(target_trajectory_.ctrl_x[0]-target_trajectory_.ctrl_x[1])<1e-2 and
+                    abs(target_trajectory_.ctrl_x[1]-target_trajectory_.ctrl_x[2])<1e-2 and
+                    abs(target_trajectory_.ctrl_x[2]-target_trajectory_.ctrl_x[3])<1e-2;
+    bool static_y = abs(target_trajectory_.ctrl_y[0]-target_trajectory_.ctrl_y[1])<1e-2 and
+                    abs(target_trajectory_.ctrl_y[1]-target_trajectory_.ctrl_y[2])<1e-2 and
+                    abs(target_trajectory_.ctrl_y[2]-target_trajectory_.ctrl_y[3])<1e-2;
+    if (static_x and static_y)
+        return true;
+    else
+        return false;
 }
 
 

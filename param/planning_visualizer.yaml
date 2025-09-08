@@ -1,6 +1,6 @@
 frame_id: map
 raw_primitives:
-  publish: false
+  publish: true
   num_time_sample: 10
   proportion: 0.2
   line_scale: 0.01
@@ -11,7 +11,7 @@ raw_primitives:
 feasible_primitives:
   publish: true
   num_time_sample: 10
-  proportion: 0.8
+  proportion: 0.2
   line_scale: 0.02
   color_a: 0.3
   color_r: 0.0

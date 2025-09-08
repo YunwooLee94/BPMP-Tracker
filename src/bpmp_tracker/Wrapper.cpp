@@ -21,8 +21,11 @@ bpmp::Wrapper::Wrapper():p_base_shared_(std::make_shared<bpmp::PlannerBase>()) {
 void bpmp::Wrapper::RunPlanning() {
     ros::Rate loop_rate(ros_wrapper_ptr_->GetPlanningFrequency());
     while(ros::ok()){
+//        cout<<"AAAAA"<<endl;
         bool planning_success = tracker_->Plan(ros_wrapper_ptr_->GetCurrentTime());
+//        cout<<"BBBBB"<<endl;
         tracker_->UpdateResultToBase(planning_success);
+//        cout<<"CCCCC"<<endl;
         ros::spinOnce();
         loop_rate.sleep();
     }

@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <vector>
 #include <ctime>
+#include <bpmp_utils/eigenmvn.h>
 
 namespace bpmp{
     using namespace std;
@@ -39,12 +40,16 @@ namespace bpmp{
         double point_resolution_{0.01};
         double simulation_dt_;
         string map_frame_id_;
+        bool analysis_mode_{false};
+        double spatial_scale_{1.0};
+        double time_scale_{1.0};
         double agent_size_;
         vector<int>object_idx_list_;
         int total_object_number_in_file_;
         int object_number_;
         int target_idx_;
         int moving_obstacle_number_;
+        int total_test_number_;
         vector<int> obstacle_idx_list_;
 
         pcl::PointCloud<pcl::PointXYZ> point_cloud_;
@@ -65,6 +70,8 @@ namespace bpmp{
         void UpdateDynamics(const double &t);
         void PrepareRosMsgs(const double &t);
         void PublishRosMsgs();
+        void ShuffleScenario();
+        std::vector<int> GenerateUniqueRandomArray(int size, int lower_bound, int upper_bound);
 
         visualization_msgs::MarkerArray obstacle_list_vis_;
         visualization_msgs::Marker obstacle_vis_;

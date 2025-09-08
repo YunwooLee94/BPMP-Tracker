@@ -1,19 +1,138 @@
 #include <bpmp_simulator/Simulator.h>
 void bpmp::Simulator::Run() {
-    double simulation_frequency = 1.0/simulation_dt_;
-    ros::Rate loop_rate(simulation_frequency);
-    double t0 = ros::Time::now().toSec();
-    double t_sim;
-    while(ros::ok()){
-        t_sim = ros::Time::now().toSec()-t0;
-        UpdateDynamics(t_sim);
-        PrepareRosMsgs(t_sim);
-        PublishRosMsgs();
-        ros::spinOnce();
-        loop_rate.sleep();
+    if (not analysis_mode_){
+        double simulation_frequency = 1.0/simulation_dt_;
+        ros::Rate loop_rate(simulation_frequency);
+        double t0 = ros::Time::now().toSec();
+        double t_sim;
+        while(ros::ok()){
+            t_sim = ros::Time::now().toSec()-t0;
+            UpdateDynamics(t_sim);
+            PrepareRosMsgs(t_sim);
+            PublishRosMsgs();
+            ros::spinOnce();
+            loop_rate.sleep();
+        }
+    }
+    else{
+        ros::Rate loop_rate(1.0/simulation_dt_);
+        double t0 = ros::Time::now().toSec();
+        double t_sim;
+        int test_cnt = 1; // For same target
+        int scenario_count = 0;
+        int success_count = 0;
+        int episode_count = 0;
+        bool fail_flag_target = false;
+        bool fail_flag_obstacle = false;
+        bool fail_flag_fov = false;
+        bool error_flag = false;
+        while(ros::ok()){
+            if(test_cnt>total_test_number_){
+                cout <<"TOTAL SCENARIO: "<<total_test_number_<< " SCENARIO CNT: "
+                     << scenario_count << ", SUCCESS CNT: " << success_count << endl;
+                break;
+            }
+            t_sim = ros::Time::now().toSec() - t0;
+            if (t_sim > object_history_list_[0].t.back()) {
+                episode_count++;
+                if(not error_flag)
+                    scenario_count++;
+                bool is_tracker_far_from_target = false;
+                double distance = sqrt(pow(current_target_state_.px - current_unicycle_state_.px, 2) +
+                                       pow(current_target_state_.py - current_unicycle_state_.py, 2));
+                if (distance > 5.0)
+                    is_tracker_far_from_target = true;
+
+                if (not(fail_flag_target or fail_flag_obstacle or fail_flag_fov or is_tracker_far_from_target))
+                    success_count++;
+                else {
+                    if(fail_flag_target)
+                        ROS_WARN("ROBOT COLLLIDES OR IS TOO FAR WITH TARGET");
+                    if(fail_flag_obstacle)
+                        ROS_WARN("ROBOT IS FAR FROM OBSTACLES");
+                    if(fail_flag_fov)
+                        ROS_WARN("ROBOT FAILS TO KEEP TARGET WITHIN FOV");
+                }
+                cout <<"TOTAL SCENARIO: "<<total_test_number_<< " SCENARIO CNT: "
+                     << scenario_count << ", SUCCESS CNT: " << success_count << endl;
+
+                fail_flag_obstacle = false;
+                fail_flag_target = false;
+                fail_flag_fov = false;
+                t0 = ros::Time::now().toSec();
+                test_cnt++;
+                ShuffleScenario();
+                double theta;
+                error_flag = true;
+                for(int try_idx=0;try_idx<100;try_idx++) {
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+                    double target_vel_start_x=0.0, target_vel_start_y=0.0;
+                    for(int i=0;i<100;i++){
+                        target_vel_start_x+=object_history_list_[target_idx_].vx[i];
+                        target_vel_start_y+=object_history_list_[target_idx_].vy[i];
+                        if(abs(target_vel_start_x)>1e-2 or abs(target_vel_start_y)>1e-2)
+                            break;
+                    }
+                    double start_azimuth = atan2(target_vel_start_y,target_vel_start_x)+M_PI;
+
+                    std::uniform_real_distribution<> theta_dis(start_azimuth-M_PI*0.1666667, start_azimuth+M_PI*0.1666667);
+                    unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
+                    theta = theta_dis(gen);
+                    current_unicycle_state_.px = object_history_list_[target_idx_].px.front() + 1.2 * cos(theta);
+                    current_unicycle_state_.py = object_history_list_[target_idx_].py.front() + 1.2 * sin(theta);
+                    current_unicycle_state_.pz = 0.5;
+                    current_unicycle_state_.theta = atan2(object_history_list_[target_idx_].py.front()-current_unicycle_state_.py,
+                                                          object_history_list_[target_idx_].px.front()-current_unicycle_state_.px);
+
+                    bool is_okay_at_start = true;
+                    double temp_distance_squared = 0.0;
+
+                    for (int j = 0; j < obstacle_idx_list_.size(); j++) {
+                        temp_distance_squared =
+                                pow(current_unicycle_state_.px - object_history_list_[obstacle_idx_list_[j]].px.front(), 2) +
+                                pow(current_unicycle_state_.py - object_history_list_[obstacle_idx_list_[j]].py.front(), 2);
+                        if (temp_distance_squared < 16*agent_size_ * agent_size_)
+                            is_okay_at_start = false;
+                    }
+                    if (is_okay_at_start){
+                        error_flag = false;
+                        break;
+                    }
+
+                }
+                t_sim = ros::Time::now().toSec() - t0;
+            }
+            UpdateDynamics(t_sim);
+            if (sqrt(pow(current_target_state_.px - current_unicycle_state_.px, 2) +
+                     pow(current_target_state_.py - current_unicycle_state_.py, 2)) < 2 * agent_size_) {
+                fail_flag_target = true;
+            } // Target-Robot Collision
+            if (sqrt(pow(current_target_state_.px - current_unicycle_state_.px, 2) +
+                     pow(current_target_state_.py - current_unicycle_state_.py, 2)) > 5.0) {
+                fail_flag_target = true;
+            } // Target-Robot Too Far
+            for (int idx = 0; idx < moving_obstacle_number_; idx++) {
+                if (sqrt(pow(current_obstacle_state_list_[idx].px - current_unicycle_state_.px, 2) +
+                         pow(current_obstacle_state_list_[idx].py - current_unicycle_state_.py, 2)) < 2 * agent_size_) {
+                    fail_flag_obstacle = true;
+                }
+            } // Obstacle-Robot Too Close
+            double direction = atan2(current_target_state_.py-current_unicycle_state_.py,current_target_state_.px-current_unicycle_state_.px);
+            double yaw_gap = abs(direction-current_unicycle_state_.theta);
+            if(yaw_gap>1.0472) // 1.0472: 60 degree, 1.309: 75 degree
+                fail_flag_fov = true;
+            PrepareRosMsgs(t_sim);
+            PublishRosMsgs();
+            ros::spinOnce();
+            loop_rate.sleep();
+        }
     }
 }
 bpmp::Simulator::Simulator() : nh_("~") {
+    nh_.param<bool>("analysis_mode",analysis_mode_,false);
+    nh_.param<double>("spatial_scale",spatial_scale_,1.0);
+    nh_.param<double>("time_scale",time_scale_,1.0);
     nh_.param<string>("map_frame_id", map_frame_id_, "map");
     nh_.param<double>("simulation_dt", simulation_dt_, 0.01);
 
@@ -33,7 +152,6 @@ bpmp::Simulator::Simulator() : nh_("~") {
 
     // Target Index
     nh_.param<int>("target_idx", target_idx_, 0);
-    target_idx_ = 0; // Analysis
     object_idx_list_.push_back(target_idx_);
     object_number_ = (int) object_idx_list_.size(); // obstacles + target
     nh_.param<string>("initial_state_file_name", initial_state_file_name_, "");
@@ -41,6 +159,7 @@ bpmp::Simulator::Simulator() : nh_("~") {
     // unstructured file name
     nh_.param<string>("obstacle_configuration_file_name", obstacle_configuration_file_name_, "");
     nh_.param<int>("moving_obstacle_number", moving_obstacle_number_, 0);
+    nh_.param<int>("total_test_number",total_test_number_,0);
 
     obstacle_vis_.header.frame_id = map_frame_id_;
     target_vis_.header.frame_id = map_frame_id_;
@@ -94,11 +213,53 @@ bpmp::Simulator::Simulator() : nh_("~") {
                                               &Simulator::control_input_callback, this);
     unicycle_control_input_subscriber_ = nh_.subscribe("/bpmp_tracker/unicycle_control_input", 1,
                                               &Simulator::unicycle_input_callback, this);
+    if(analysis_mode_){
+        ReadObjectTrajectory();
+        ShuffleScenario();
+        double theta;
+        while (true) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            double target_vel_start_x=0.0, target_vel_start_y=0.0;
+            for(int i=0;i<100;i++){
+                target_vel_start_x+=object_history_list_[target_idx_].vx[i];
+                target_vel_start_y+=object_history_list_[target_idx_].vy[i];
+                if(abs(target_vel_start_x)>1e-2 or abs(target_vel_start_y)>1e-2)
+                    break;
+            }
+            double start_azimuth = atan2(target_vel_start_y,target_vel_start_x)+M_PI;
+            cout<<"START AZIMUTH Y: "<<target_vel_start_y
+                <<"X: "<<target_vel_start_x<<endl;
 
-    ReadInitialTrackerStateList();
-    ReadObjectTrajectory();
-    if (is_unstructured_)
-        ReadObstacleConfiguration();
+            std::uniform_real_distribution<> theta_dis(start_azimuth-M_PI*0.1666667, start_azimuth+M_PI*0.1666667);
+            unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
+            theta = theta_dis(gen);
+            current_unicycle_state_.px = object_history_list_[target_idx_].px.front() + 1.2 * cos(theta);
+            current_unicycle_state_.py = object_history_list_[target_idx_].py.front() + 1.2 * sin(theta);
+            current_unicycle_state_.pz = 0.5;
+            current_unicycle_state_.theta = atan2(object_history_list_[target_idx_].py.front()-current_unicycle_state_.py,
+                                                  object_history_list_[target_idx_].px.front()-current_unicycle_state_.px);
+
+            bool is_okay_at_start = true;
+            double temp_distance_squared = 0.0;
+
+            for (int j = 0; j < obstacle_idx_list_.size(); j++) {
+                temp_distance_squared =
+                        pow(current_unicycle_state_.px - object_history_list_[obstacle_idx_list_[j]].px.front(), 2) +
+                        pow(current_unicycle_state_.py - object_history_list_[obstacle_idx_list_[j]].py.front(), 2);
+                if (temp_distance_squared < 16*agent_size_ * agent_size_)
+                    is_okay_at_start = false;
+            }
+            if (is_okay_at_start)
+                break;
+        }
+    }
+    else{
+        ReadInitialTrackerStateList();
+        ReadObjectTrajectory();
+        if (is_unstructured_)
+            ReadObstacleConfiguration();
+    }
 }
 
 void bpmp::Simulator::ReadObjectTrajectory() {
@@ -124,13 +285,13 @@ void bpmp::Simulator::ReadObjectTrajectory() {
         object_history_list_.push_back(temp_obstacle_history);
     for (int i = 0; i < object_number_; i++) {
         for (int j = 0; j < content.size(); j++) {
-            object_history_list_[i].t.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 1]));   // t
-            object_history_list_[i].px.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 2]));   // px
-            object_history_list_[i].py.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 3]));   // py
-            object_history_list_[i].pz.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 4]));   // pz
-            object_history_list_[i].vx.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 5]));   // vx
-            object_history_list_[i].vy.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 6]));   // vy
-            object_history_list_[i].vz.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 7]));   // vz
+            object_history_list_[i].t.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 1])/time_scale_);   // t
+            object_history_list_[i].px.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 2])*spatial_scale_);   // px
+            object_history_list_[i].py.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 3])*spatial_scale_);   // py
+            object_history_list_[i].pz.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 4])*spatial_scale_);   // pz
+            object_history_list_[i].vx.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 5])*spatial_scale_*time_scale_);   // vx
+            object_history_list_[i].vy.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 6])*spatial_scale_*time_scale_);   // vy
+            object_history_list_[i].vz.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 7])*spatial_scale_*time_scale_);   // vz
         }
     }
 }
@@ -250,9 +411,10 @@ void bpmp::Simulator::PublishRosMsgs() {
     tracker_vis_publisher_.publish(tracker_vis_);
     obstacle_list_vis_publisher_.publish(obstacle_list_vis_);
     target_vis_publisher_.publish(target_vis_);
-    pcl_publisher_.publish(point_cloud_);
-    pcl_boxes_vis_publisher_.publish(pcl_boxes_vis_);
-
+    if(is_unstructured_){
+        pcl_publisher_.publish(point_cloud_);
+        pcl_boxes_vis_publisher_.publish(pcl_boxes_vis_);
+    }
     tracker_state_publisher_.publish(tracker_state_msg_);
     obstacle_state_list_publisher_.publish(obstacle_state_list_msg_);
     target_state_publisher_.publish(target_state_msg_);
@@ -271,8 +433,13 @@ void bpmp::Simulator::control_input_callback(const bpmp_tracker::ControlInput &m
 }
 
 void bpmp::Simulator::ReadObstacleConfiguration() {
-
     std::ifstream obstacle_file;
+    if(obstacle_configuration_file_name_.c_str()==""){
+        cout<<"NO PCL FILE"<<endl;
+        return;
+    }
+    else
+        cout<<"YES PCL FILE"<<endl;
     obstacle_file.open(obstacle_configuration_file_name_.c_str());
     double v1[2]{0.0, 0.0};
     double v2[2]{0.0, 0.0};
@@ -372,4 +539,31 @@ void bpmp::Simulator::ReadObstacleConfiguration() {
 void bpmp::Simulator::unicycle_input_callback(const bpmp_tracker::UnicycleInput &msg) {
     unicycle_control_input_.linear_speed = msg.vel_linear;
     unicycle_control_input_.angular_speed = msg.vel_angular;
+}
+
+void bpmp::Simulator::ShuffleScenario() {
+    vector<int> index_array = GenerateUniqueRandomArray(moving_obstacle_number_ + 1, 0, object_number_-1);
+    target_idx_ = index_array.back();
+    index_array.pop_back();
+    obstacle_idx_list_.clear();
+    obstacle_idx_list_ = index_array;
+}
+
+std::vector<int> bpmp::Simulator::GenerateUniqueRandomArray(int size, int lower_bound, int upper_bound) {
+    // Ensure that the range is large enough to have unique numbers
+    if (upper_bound - lower_bound + 1 < size) {
+        throw std::invalid_argument("Range too small to generate unique numbers of this size.");
+    }
+    // Create a vector containing all possible numbers within the range
+    std::vector<int> allNumbers;
+    for (int i = lower_bound; i <= upper_bound; ++i) {
+        allNumbers.push_back(i);
+    }
+    // Initialize a random number generator
+    std::mt19937 rng(static_cast<unsigned int>(std::time(nullptr)));
+    // Shuffle the numbers
+    std::shuffle(allNumbers.begin(), allNumbers.end(), rng);
+    // Take the first 'size' elements from the shuffled vector
+    std::vector<int> randomArray(allNumbers.begin(), allNumbers.begin() + size);
+    return randomArray;
 }
