@@ -12,6 +12,9 @@ find_package(catkin REQUIRED COMPONENTS
   decomp_ros_utils
   tf
   pcl_conversions
+  message_filters
+  geometry_msgs
+  nav_msgs
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${DECOMP_UTIL_INCLUDE_DIRS})
@@ -50,3 +53,11 @@ target_link_libraries(bpmp_predictor ${catkin_LIBRARIES} -lstdc++fs)
 
 add_executable(bpmp_tracker exe/main_tracker.cpp ${BPMP_TRACKER_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(bpmp_tracker ${catkin_LIBRARIES} -lstdc++fs)
+
+install(TARGETS
+  bpmp_predictor
+  bpmp_simulator
+  bpmp_ros_type_converter
+  bpmp_tracker
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

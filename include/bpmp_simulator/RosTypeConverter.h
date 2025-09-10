@@ -1,7 +1,7 @@
 //
 // Created by larr-laptop on 25. 4. 15.
 //
-
+#pragma once
 #ifndef BPMP_TRACKER_ROSTYPECONVERTER_H
 #define BPMP_TRACKER_ROSTYPECONVERTER_H
 #include <ros/ros.h>
@@ -9,12 +9,23 @@
 #include <nav_msgs/Odometry.h> // Robot
 #include <bpmp_tracker/RobotState.h>
 #include <bpmp_tracker/ObjectState.h>
+#include <bpmp_tracker/ObjectStateList.h>
+#include <geometry_msgs/Twist.h>
 #include <bpmp_tracker/UnicycleInput.h>
 #include <vector>
+#include <array>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/point_cloud.h>
-#include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl_ros/transforms.h>
+#include <ros/message_traits.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
+
 namespace bpmp{
     struct TargetVelocity{
         double vx;
@@ -26,6 +37,7 @@ namespace bpmp{
         void Run();
     private:
         ros::NodeHandle nh_;
+        ros::NodeHandle pnh_;
         ros::Subscriber TargetPositionSubscriber_;
         ros::Subscriber RobotOdometrySuscriber_;
         ros::Subscriber PclSubscriber_;
@@ -33,7 +45,57 @@ namespace bpmp{
         ros::Publisher PclPublisher_;
         ros::Subscriber UnicycleInputSubscriber_;
         ros::Publisher UnicycleInputPublisher_;
+        ros::Publisher RobotOdometryPublisher_;
+        std::vector<std::string> dynamic_topics_;
+        ros::Publisher DynamicObstaclesPublisher_;
 
+        struct ObstacleTracker {
+            bpmp_tracker::ObjectState curr;   // 현재 추정 상태 
+            bpmp_tracker::ObjectState prev;   // 이전 상태(속도 계산용)
+            std::array<TargetVelocity,5> vel_hist{}; // 단순 이동평균(5샘플)
+            int  count{0};      // warm-up 5회까지
+            int  iter{0};       // vel_hist 인덱스
+            double t_last{0.0}; // 마지막 갱신 curTime()
+            bool received{false};
+        };
+        std::array<ObstacleTracker,10> dyn_;     // 10개 장애물 버퍼
+        
+
+
+        using Policy5 = message_filters::sync_policies::ApproximateTime<
+        geometry_msgs::PoseStamped, geometry_msgs::PoseStamped, geometry_msgs::PoseStamped,
+        geometry_msgs::PoseStamped, geometry_msgs::PoseStamped>;
+
+        std::unique_ptr< message_filters::Subscriber<geometry_msgs::PoseStamped> > subDyn_[10];
+        std::unique_ptr< message_filters::Synchronizer<Policy5> > syncA_;
+        std::unique_ptr< message_filters::Synchronizer<Policy5> > syncB_;
+
+        // 그룹별 최신 묶음 보관 후 병합
+        std::vector<bpmp_tracker::ObjectState> last_groupA_;
+        std::vector<bpmp_tracker::ObjectState> last_groupB_;
+        ros::Time last_stamp_A_;
+        ros::Time last_stamp_B_;
+
+        // 동기화 파라미터
+        double sync_slop_sec_{0.1};   // 그룹 A/B 간 병합 허용 시간차(초)
+        int queue_size_{10};
+        double dynamic_z_offset_{0.0};
+
+        void UpdateObstacleFromPose(int idx, const geometry_msgs::PoseStampedConstPtr& msg);
+
+        // 그룹 콜백 & 병합 함수
+        void DynGroupACb(const geometry_msgs::PoseStampedConstPtr& m0,
+            const geometry_msgs::PoseStampedConstPtr& m1,
+            const geometry_msgs::PoseStampedConstPtr& m2,
+            const geometry_msgs::PoseStampedConstPtr& m3,
+            const geometry_msgs::PoseStampedConstPtr& m4);
+        void DynGroupBCb(const geometry_msgs::PoseStampedConstPtr& m5,
+            const geometry_msgs::PoseStampedConstPtr& m6,
+            const geometry_msgs::PoseStampedConstPtr& m7,
+            const geometry_msgs::PoseStampedConstPtr& m8,
+            const geometry_msgs::PoseStampedConstPtr& m9);
+
+        void TryMergeAndPublish();
         double t0_;
         double t0_history_;
         int odom_count_=0;
@@ -51,6 +113,8 @@ namespace bpmp{
         bpmp_tracker::ObjectState previous_target_state_;
         std::vector<TargetVelocity> vel_history_;
         void Publish();
+        tf::TransformListener tf_listener_;
+        double speed_log_period_{1.0};
     };
 };
 

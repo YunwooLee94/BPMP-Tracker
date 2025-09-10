@@ -2,18 +2,40 @@
 <launch>
     <arg name="rviz_display" default="true"/>
     <group if = "$(arg rviz_display)">
-        <node name="rviz" pkg="rviz" type="rviz" args="-d $(find bpmp_tracker)/launch/rviz_config/unstructured_sim.rviz" output="log"/>
+        <node name="rviz" pkg="rviz" type="rviz" args="-d /home/hsj/Cosys-AirSim/ros/python_ws/src/BPMP-Tracker/launch/rviz_config/unstructured_sim.rviz" output="log"/>
     </group>
 
     <node pkg="bpmp_tracker" type="bpmp_predictor" name="bpmp_predictor" output="screen">
-        <rosparam command="load" file="$(find bpmp_tracker)/param/predictor.yaml"/>
-        <rosparam command="load" file="$(find bpmp_tracker)/param/prediction_visualizer.yaml"/>
+        <rosparam command="load" file="/home/hsj/Cosys-AirSim/ros/python_ws/src/BPMP-Tracker/param/predictor.yaml"/>
+        <rosparam command="load" file="/home/hsj/Cosys-AirSim/ros/python_ws/src/BPMP-Tracker/param/prediction_visualizer.yaml"/>
     </node>
     <node pkg="bpmp_tracker" type="bpmp_tracker" name="bpmp_tracker" output="screen">
-        <rosparam command="load" file="$(find bpmp_tracker)/param/planner.yaml"/>
-        <rosparam command="load" file="$(find bpmp_tracker)/param/planning_visualizer.yaml"/>
+        <rosparam command="load" file="/home/hsj/Cosys-AirSim/ros/python_ws/src/BPMP-Tracker/param/planner.yaml"/>
+        <rosparam command="load" file="/home/hsj/Cosys-AirSim/ros/python_ws/src/BPMP-Tracker/param/planning_visualizer.yaml"/>
+        <remap from="/bpmp_simulator/point_cloud_obstacle" to="/airsim/lopcl"/>
+        <!-- <remap from="/base_odom" to="/airsim/odom"/> -->
     </node>
     <node pkg="bpmp_tracker" type="bpmp_ros_type_converter" name="bpmp_ros_type_converter" output="screen">
-    </node>
+        <remap from="/target_pose" to="/airsim/object/target/pose"/>
+        <remap from="/points_masked" to="/airsim/lopcl"/>
+        <!-- <remap from="/base_odom" to="/airsim/odom"/> -->
+        <remap from="/move_base/cmd_vel" to="/airsim/carcontrol"/>
+        <rosparam param="object_poses_individual_topics">
+            [/airsim/object/dynamic_1/pose,
+            /airsim/object/dynamic_2/pose,
+            /airsim/object/dynamic_3/pose,
+            /airsim/object/dynamic_4/pose,
+            /airsim/object/dynamic_5/pose,
+            /airsim/object/dynamic_6/pose,
+            /airsim/object/dynamic_7/pose,
+            /airsim/object/dynamic_8/pose,
+            /airsim/object/dynamic_9/pose,
+            /airsim/object/dynamic_10/pose]
+        </rosparam>
 
+        <param name="dynamic_queue_size" value="10"/>
+        <param name="dynamic_sync_slop"  value="0.1"/>
+        <param name="dynamic_z_offset"   value="0.0"/>
+    </node>
+    
 </launch>
