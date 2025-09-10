@@ -1,0 +1,25 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/hsj/Cosys-AirSim/ros/python_ws/devel_isolated/wifi_msgs/lib/python3/dist-packages",
+        "/home/hsj/Cosys-AirSim/ros/python_ws/install_isolated/lib/python3/dist-packages",
+        "/home/hsj/ros_catkin_ws/devel_isolated/tf/lib/python3/dist-packages",
+        "/home/hsj/ros_catkin_ws/devel_isolated/catkin/lib/python3/dist-packages",
+        "/home/hsj/ros_catkin_ws/install_isolated/lib/python3/dist-packages",
+        "/home/hsj/ros_catkin_ws/devel/lib/python3/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/hsj/Cosys-AirSim/ros/python_ws/devel_isolated/wifi_msgs/lib/python3/dist-packages",
+        "/home/hsj/Cosys-AirSim/ros/python_ws/install_isolated/lib/python3/dist-packages",
+        "/home/hsj/ros_catkin_ws/devel_isolated/tf/lib/python3/dist-packages",
+        "/home/hsj/ros_catkin_ws/devel_isolated/catkin/lib/python3/dist-packages",
+        "/home/hsj/ros_catkin_ws/install_isolated/lib/python3/dist-packages",
+        "/home/hsj/ros_catkin_ws/devel/lib/python3/dist-packages"
+    ],
+    "files.associations": {
+        "array": "cpp",
+        "bitset": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "utility": "cpp"
+    }
+}

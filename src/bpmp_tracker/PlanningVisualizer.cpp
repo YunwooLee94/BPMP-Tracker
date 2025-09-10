@@ -187,7 +187,7 @@ void bpmp::PlanningVisualizer::UpdateParameter(const bpmp::VisualizationParam &p
     feasible_primitive_.pose.orientation.y = 0.0;
     feasible_primitive_.pose.orientation.z = 0.0;
     // BEST PRIMITIVE
-    best_primitive_.header.frame_id = param_.frame_id;
+    best_primitive_.header.frame_id = "current";
     best_primitive_.type = visualization_msgs::Marker::LINE_STRIP;
     best_primitive_.scale.x = param_.best_primitive.line_scale;
     best_primitive_.ns = "TRACKER_BEST";
@@ -230,7 +230,7 @@ bpmp::PlanningVisualizer::PlanningVisualizer(const bpmp::VisualizationParam &vis
     feasible_primitive_.pose.orientation.y = 0.0;
     feasible_primitive_.pose.orientation.z = 0.0;
     // BEST PRIMITIVE
-    best_primitive_.header.frame_id = param_.frame_id;
+    best_primitive_.header.frame_id = "current";
     best_primitive_.type = visualization_msgs::Marker::LINE_STRIP;
     best_primitive_.scale.x = param_.best_primitive.line_scale;
     best_primitive_.ns = "TRACKER_BEST";
