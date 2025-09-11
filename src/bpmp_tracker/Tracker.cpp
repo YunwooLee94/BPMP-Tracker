@@ -112,6 +112,7 @@ void bpmp::Tracker::UpdateValue(const double &t) {
             obstacle_primitive_list_.push_back(temp_primitive);
         }
         p_base_->mutex_set_[0].unlock();
+//	cout<<"OBSTACLE LIST SIZE: "<<obstacle_primitive_list_.size()<<endl;
     }
     {   // Target State
         vector<Eigen::Vector3d> target_ctrl_points;
@@ -402,19 +403,19 @@ void bpmp::Tracker::GetFOVIndexThread(const int &start_idx, const int &end_idx, 
                 break;
             }
         }
-        if(not flag_store_fov)
-            continue;
-        for (int j=0;j<=5;j++){
-            value = 0.0;
-            for(int k = std::max(0,j-3);k<=std::min(2,j);k++){
-                value += double(nchooser(2,k))*double(nchooser(3,j-k))/double(nchooser(5,j))*
-                        (vel_x[k]*rel_x[j-k]+vel_y[k]*rel_y[j-k]);
-            }
-            if(value<0.0){
-                flag_store_fov = false;
-                break;
-            }
-        }
+//        if(not flag_store_fov)
+//            continue;
+//        for (int j=0;j<=5;j++){
+//            value = 0.0;
+//            for(int k = std::max(0,j-3);k<=std::min(2,j);k++){
+//                value += double(nchooser(2,k))*double(nchooser(3,j-k))/double(nchooser(5,j))*
+//                        (vel_x[k]*rel_x[j-k]+vel_y[k]*rel_y[j-k]);
+//            }
+//            if(value<0.0){
+//                flag_store_fov = false;
+//                break;
+//            }
+//        }
         if(flag_store_fov)
             visible_idx_sub.push_back(idx);
     }
@@ -621,7 +622,7 @@ void bpmp::Tracker::GetSafeIndexUnstructuredThread(const std::vector<uint> &prio
                 }
             }
             if (flag_store_in2) {
-                safe_idx_sub.push_back(idx);
+                safe_idx_sub.push_back(prior_idx[idx]);
             }
         }
     }
@@ -828,6 +829,7 @@ int bpmp::Tracker::EnvironmentMode() {
     if(p_base_->is_pcl_received_ and p_base_->is_dynobs_received_)
         mode = 2;
     p_base_->mutex_set_[0].unlock();
+    //cout<<"MODE: "<<mode<<endl;
     return mode;
 }
 
@@ -954,7 +956,7 @@ bpmp::Tracker::GetSafeIndexDynamicThread(const std::vector<uint> &prior_idx, con
             }
         }
         if (flag_store_out and flag_store_in3)
-            safe_idx_sub.push_back(idx);
+            safe_idx_sub.push_back(prior_idx[idx]);
     }
 }
 
