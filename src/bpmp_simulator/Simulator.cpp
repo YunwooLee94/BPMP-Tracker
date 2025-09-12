@@ -79,8 +79,8 @@ void bpmp::Simulator::Run() {
                     std::uniform_real_distribution<> theta_dis(start_azimuth-M_PI*0.1666667, start_azimuth+M_PI*0.1666667);
                     unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
                     theta = theta_dis(gen);
-                    current_unicycle_state_.px = object_history_list_[target_idx_].px.front() + 1.2 * cos(theta);
-                    current_unicycle_state_.py = object_history_list_[target_idx_].py.front() + 1.2 * sin(theta);
+                    current_unicycle_state_.px = object_history_list_[target_idx_].px.front() + 1.0 * cos(theta);
+                    current_unicycle_state_.py = object_history_list_[target_idx_].py.front() + 1.0 * sin(theta);
                     current_unicycle_state_.pz = 0.5;
                     current_unicycle_state_.theta = atan2(object_history_list_[target_idx_].py.front()-current_unicycle_state_.py,
                                                           object_history_list_[target_idx_].px.front()-current_unicycle_state_.px);
@@ -119,8 +119,12 @@ void bpmp::Simulator::Run() {
                 }
             } // Obstacle-Robot Too Close
             double direction = atan2(current_target_state_.py-current_unicycle_state_.py,current_target_state_.px-current_unicycle_state_.px);
-            double yaw_gap = abs(direction-current_unicycle_state_.theta);
-            if(yaw_gap>1.0472) // 1.0472: 60 degree, 1.309: 75 degree
+            double yaw_gap = direction-current_unicycle_state_.theta;
+            yaw_gap = fmod(yaw_gap+M_PI,2.0*M_PI);
+            if(yaw_gap<0)
+                yaw_gap += 2.0*M_PI;
+            yaw_gap -= M_PI;
+            if(abs(yaw_gap)>1.0472) // 1.0472: 60 degree, 1.309: 75 degree
                 fail_flag_fov = true;
             PrepareRosMsgs(t_sim);
             PublishRosMsgs();
@@ -234,8 +238,8 @@ bpmp::Simulator::Simulator() : nh_("~") {
             std::uniform_real_distribution<> theta_dis(start_azimuth-M_PI*0.1666667, start_azimuth+M_PI*0.1666667);
             unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
             theta = theta_dis(gen);
-            current_unicycle_state_.px = object_history_list_[target_idx_].px.front() + 1.2 * cos(theta);
-            current_unicycle_state_.py = object_history_list_[target_idx_].py.front() + 1.2 * sin(theta);
+            current_unicycle_state_.px = object_history_list_[target_idx_].px.front() + 1.0 * cos(theta);
+            current_unicycle_state_.py = object_history_list_[target_idx_].py.front() + 1.0 * sin(theta);
             current_unicycle_state_.pz = 0.5;
             current_unicycle_state_.theta = atan2(object_history_list_[target_idx_].py.front()-current_unicycle_state_.py,
                                                   object_history_list_[target_idx_].px.front()-current_unicycle_state_.px);

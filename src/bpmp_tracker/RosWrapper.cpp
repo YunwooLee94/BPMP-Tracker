@@ -49,7 +49,21 @@ void bpmp::RosWrapper::PublishRosMsgs() {
         else{
             bpmp_tracker::UnicycleInput zero_input;
             zero_input.vel_linear = 0.0;
-            zero_input.vel_angular = 0.0;
+            p_base_->mutex_set_[0].lock();
+            double yaw, px,py,qx,qy;
+            yaw = p_base_->current_tracker_list_read_.theta;
+            px = p_base_->current_tracker_list_read_.px;
+            py = p_base_->current_tracker_list_read_.py;
+            qx = p_base_->target_prediction_read_.ctrl_x[0];
+            qy = p_base_->target_prediction_read_.ctrl_y[0];
+            p_base_->mutex_set_[0].unlock();
+            double desired_yaw = atan2(qy-py,qx-px);
+            double yaw_gap = desired_yaw - yaw;
+            yaw_gap = fmod(yaw_gap+M_PI,2.0*M_PI);
+            if (yaw_gap<0)
+                yaw_gap+=2.0*M_PI;
+            yaw_gap -= M_PI;
+            zero_input.vel_angular= (1.0)*yaw_gap;
             tracker_control_input_publisher_.publish(zero_input);
         }
         p_base_->mutex_set_[1].unlock();
@@ -256,9 +270,13 @@ bpmp::RosWrapper::GenerateControlInput(const std::vector<bpmp::PrimitivePlanning
 
     tracker_input.vel_linear = sqrt(std::pow(bpmp::getBernsteinValue(vel_ctrl_x, time_t, primitive[best_index].t0, primitive[best_index].tf, 2),2)+
                                     pow(bpmp::getBernsteinValue(vel_ctrl_y, time_t,primitive[best_index].t0, primitive[best_index].tf, 2),2));
-    if(pos_ctrl_x[3]<0)
+    if(pos_ctrl_x[3]<0){
         tracker_input.vel_linear = -tracker_input.vel_linear;
-    if (abs(tracker_input.vel_linear)<1e-2){
+//        tracker_input.vel_angular = 0.0;
+//        tracker_input.vel_angular = -tracker_input.vel_angular;
+    }
+
+    if (abs(tracker_input.vel_linear)<1e-4){
         tracker_input.vel_linear = 0.0;
         tracker_input.vel_angular = 0.0;
     }
@@ -270,9 +288,9 @@ bpmp::RosWrapper::GenerateControlInput(const std::vector<bpmp::PrimitivePlanning
         tracker_input.vel_angular = tracker_input_angular_num/tracker_input_angular_den;
     }
     static bpmp_tracker::UnicycleInput previous_output = tracker_input;
-    tracker_input.vel_linear = 0.3*previous_output.vel_linear+0.7*tracker_input.vel_linear;
-    tracker_input.vel_angular = 0.3*previous_output.vel_angular+0.7*tracker_input.vel_angular;
-    tracker_input.vel_linear = min(2.0,max(-2.0,tracker_input.vel_linear));
+    tracker_input.vel_linear = 0.1*previous_output.vel_linear+0.9*tracker_input.vel_linear;
+    tracker_input.vel_angular = 0.1*previous_output.vel_angular+0.9*tracker_input.vel_angular;
+    tracker_input.vel_linear = min(2.5,max(-0.5,tracker_input.vel_linear));
     tracker_input.vel_angular = min(3.141592,max(-3.141592,tracker_input.vel_angular));
     return tracker_input;
 }

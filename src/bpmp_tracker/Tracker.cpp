@@ -8,6 +8,12 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
         UpdateValue(t_trigger);
     else
         return false;
+    if(IsTargetStatic()){
+//        static int cnt=0;
+//        cout<<"STOPSTOP: "<<cnt++<<endl;
+        return false;
+    }
+
     if(not SampleEndPoint()){
         return false;
     }
@@ -16,6 +22,7 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
     bool pass_test0 = true;
     if(visible_index_.empty()){
         pass_test0 = false;
+        cout<<"NO VISIBLE INDEX"<<endl;
     }
     if(pass_test0){
         switch (EnvironmentMode()){
@@ -46,6 +53,7 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
         return false;
     bool pass_test1 = true;
     if(safe_index_.empty()){
+        cout<<"NO SAFE INDEX"<<endl;
         pass_test1 = false;
     }
     if (pass_test1) {
@@ -82,37 +90,48 @@ void bpmp::Tracker::UpdateValue(const double &t) {
     }
     {   // Obstacle State
         obstacle_primitive_list_.clear();
-        bpmp::PrimitivePlanning temp_primitive;
-        temp_primitive.t0 = t;
-        temp_primitive.tf = t + param_.horizon;
+        bpmp::PrimitivePlanning temp_global_primitive;
+        temp_global_primitive.t0 = t;
+        temp_global_primitive.tf = t + param_.horizon;
+        bpmp::PrimitivePlanning temp_local_primitive;
+        temp_local_primitive.t0 = t;
+        temp_local_primitive.tf = t+ param_.horizon;
         p_base_->mutex_set_[0].lock();
         num_obstacle_ = (int) p_base_->current_obstacle_list_read_.size();
-        for (int i = 0; i < num_obstacle_; i++) {
-            temp_primitive.ctrl_x[0] = p_base_->current_obstacle_list_read_[i].px;
-            temp_primitive.ctrl_x[1] = p_base_->current_obstacle_list_read_[i].px +
-                                       0.33333333 * p_base_->current_obstacle_list_read_[i].vx * param_.horizon;
-            temp_primitive.ctrl_x[2] = p_base_->current_obstacle_list_read_[i].px +
-                                       0.66666667 * p_base_->current_obstacle_list_read_[i].vx * param_.horizon;
-            temp_primitive.ctrl_x[3] = p_base_->current_obstacle_list_read_[i].px +
-                                       p_base_->current_obstacle_list_read_[i].vx * param_.horizon;
-            temp_primitive.ctrl_y[0] = p_base_->current_obstacle_list_read_[i].py;
-            temp_primitive.ctrl_y[1] = p_base_->current_obstacle_list_read_[i].py +
-                                       0.33333333 * p_base_->current_obstacle_list_read_[i].vy * param_.horizon;
-            temp_primitive.ctrl_y[2] = p_base_->current_obstacle_list_read_[i].py +
-                                       0.66666667 * p_base_->current_obstacle_list_read_[i].vy * param_.horizon;
-            temp_primitive.ctrl_y[3] = p_base_->current_obstacle_list_read_[i].py +
-                                       p_base_->current_obstacle_list_read_[i].vy * param_.horizon;
-            temp_primitive.ctrl_z[0] = p_base_->current_obstacle_list_read_[i].pz;
-            temp_primitive.ctrl_z[1] = p_base_->current_obstacle_list_read_[i].pz +
-                                       0.33333333 * p_base_->current_obstacle_list_read_[i].vz * param_.horizon;
-            temp_primitive.ctrl_z[2] = p_base_->current_obstacle_list_read_[i].pz +
-                                       0.66666667 * p_base_->current_obstacle_list_read_[i].vz * param_.horizon;
-            temp_primitive.ctrl_z[3] = p_base_->current_obstacle_list_read_[i].pz +
-                                       p_base_->current_obstacle_list_read_[i].vz * param_.horizon;
-            obstacle_primitive_list_.push_back(temp_primitive);
-        }
         p_base_->mutex_set_[0].unlock();
-//	cout<<"OBSTACLE LIST SIZE: "<<obstacle_primitive_list_.size()<<endl;
+        for (int i = 0; i < num_obstacle_; i++) {
+            p_base_->mutex_set_[0].lock();
+            temp_global_primitive.ctrl_x[0] = p_base_->current_obstacle_list_read_[i].px;
+            temp_global_primitive.ctrl_x[1] = p_base_->current_obstacle_list_read_[i].px +
+                                       0.33333333 * p_base_->current_obstacle_list_read_[i].vx * param_.horizon;
+            temp_global_primitive.ctrl_x[2] = p_base_->current_obstacle_list_read_[i].px +
+                                       0.66666667 * p_base_->current_obstacle_list_read_[i].vx * param_.horizon;
+            temp_global_primitive.ctrl_x[3] = p_base_->current_obstacle_list_read_[i].px +
+                                       p_base_->current_obstacle_list_read_[i].vx * param_.horizon;
+            temp_global_primitive.ctrl_y[0] = p_base_->current_obstacle_list_read_[i].py;
+            temp_global_primitive.ctrl_y[1] = p_base_->current_obstacle_list_read_[i].py +
+                                       0.33333333 * p_base_->current_obstacle_list_read_[i].vy * param_.horizon;
+            temp_global_primitive.ctrl_y[2] = p_base_->current_obstacle_list_read_[i].py +
+                                       0.66666667 * p_base_->current_obstacle_list_read_[i].vy * param_.horizon;
+            temp_global_primitive.ctrl_y[3] = p_base_->current_obstacle_list_read_[i].py +
+                                       p_base_->current_obstacle_list_read_[i].vy * param_.horizon;
+            temp_global_primitive.ctrl_z[0] = p_base_->current_obstacle_list_read_[i].pz;
+            temp_global_primitive.ctrl_z[1] = p_base_->current_obstacle_list_read_[i].pz +
+                                       0.33333333 * p_base_->current_obstacle_list_read_[i].vz * param_.horizon;
+            temp_global_primitive.ctrl_z[2] = p_base_->current_obstacle_list_read_[i].pz +
+                                       0.66666667 * p_base_->current_obstacle_list_read_[i].vz * param_.horizon;
+            temp_global_primitive.ctrl_z[3] = p_base_->current_obstacle_list_read_[i].pz +
+                                       p_base_->current_obstacle_list_read_[i].vz * param_.horizon;
+            p_base_->mutex_set_[0].unlock();
+            for(int j=0;j<4;j++){
+                Eigen::Vector3d ctrl_pts_global (temp_global_primitive.ctrl_x[j],temp_global_primitive.ctrl_y[j],temp_global_primitive.ctrl_z[j]);
+                Eigen::Vector3d ctrl_pts_local = current_pose_mat_.inverse()*ctrl_pts_global;
+                temp_local_primitive.ctrl_x[j] = ctrl_pts_local[0];
+                temp_local_primitive.ctrl_y[j] = ctrl_pts_local[1];
+                temp_local_primitive.ctrl_z[j] = ctrl_pts_local[2];
+            }
+            obstacle_primitive_list_.push_back(temp_local_primitive);
+        }
     }
     {   // Target State
         vector<Eigen::Vector3d> target_ctrl_points;
@@ -197,14 +216,14 @@ void bpmp::Tracker::SampleEndPointThread(const int &start_idx, const int &end_id
     double center_angle;
     double qx = target_trajectory_.ctrl_x[3]-target_trajectory_.ctrl_x[2];
     double qy = target_trajectory_.ctrl_y[3]-target_trajectory_.ctrl_y[2];
-    if(abs(qx)<1e-4 and abs(qy)<1e-4 ){
+    if(abs(qx)<1e-2 and abs(qy)<1e-2 ){
         center_angle = std::atan2(target_trajectory_.ctrl_y[0],target_trajectory_.ctrl_x[0])+M_PI;
     } else{
         center_angle = std::atan2(qy,qx)+M_PI;
         if(qx*target_trajectory_.ctrl_x[0]+qy*target_trajectory_.ctrl_y[0]<0) // Closing Direction
             center_angle = std::atan2(qy,qx);
     }
-    double half_range = 0.5* param_.fov;
+    double half_range = 0.3333* param_.fov;
     std::uniform_real_distribution<> theta_dis(center_angle - half_range, center_angle + half_range);
     double r, theta;
     Point tempPoint{end_point_center.x, end_point_center.y, end_point_center.z};
@@ -906,6 +925,8 @@ bpmp::Tracker::GetSafeIndexDynamicThread(const std::vector<uint> &prior_idx, con
                 if (value<min_value_target_obstacle)
                     min_value_target_obstacle = value;
             }
+            if(min_value_target_obstacle<1e-5)
+                cout<<"HOLLLLLLLLLLLLLLLLLLLLL"<<endl;
             min_value_target_obstacle = std::max(0.0,min_value_target_obstacle);
             for (int j = 0; j <= 6; j++) {
                 flag_store_in2 = true;
@@ -961,12 +982,8 @@ bpmp::Tracker::GetSafeIndexDynamicThread(const std::vector<uint> &prior_idx, con
 }
 
 bool bpmp::Tracker::IsTargetStatic() {
-    bool static_x = abs(target_trajectory_.ctrl_x[0]-target_trajectory_.ctrl_x[1])<1e-2 and
-                    abs(target_trajectory_.ctrl_x[1]-target_trajectory_.ctrl_x[2])<1e-2 and
-                    abs(target_trajectory_.ctrl_x[2]-target_trajectory_.ctrl_x[3])<1e-2;
-    bool static_y = abs(target_trajectory_.ctrl_y[0]-target_trajectory_.ctrl_y[1])<1e-2 and
-                    abs(target_trajectory_.ctrl_y[1]-target_trajectory_.ctrl_y[2])<1e-2 and
-                    abs(target_trajectory_.ctrl_y[2]-target_trajectory_.ctrl_y[3])<1e-2;
+    bool static_x = abs(target_trajectory_.ctrl_x[0]-target_trajectory_.ctrl_x[1])<1e-2;
+    bool static_y = abs(target_trajectory_.ctrl_y[0]-target_trajectory_.ctrl_y[1])<1e-2;
     if (static_x and static_y)
         return true;
     else

@@ -3,7 +3,7 @@ planning_frequency: 20.0
 horizon: 1.0
 num_thread: 4
 num_sample_planning: 1000
-r_min: 1.0
+r_min: 0.8
 r_max: 1.2
 safe_distance: 0.05
 distance_max: 2.0
