@@ -8,12 +8,12 @@ r_max: 1.2
 safe_distance: 0.05
 distance_max: 2.0
 terminal_weight: 10.0
-vel_max: 2.0
-acc_max: 5.0
+vel_max: 3.0
+acc_max: 6.0
 ang_max: 3.141592
 fov: 2.09 # 2.09: (120 degree), 2.618: (150 degree)
 object_radius: 0.25
 is_experiment: false
 is_unstructured: true
 sample_mode: 0 # 0: fov_considerd, 1 fov_not_considered
-check_mode: 0 # 0: proposed, 1: DMVC-Tracker, 2:BPMP-Tracker
+check_mode: 2 # 0: proposed, 1: DMVC-Tracker, 2:BPMP-Tracker

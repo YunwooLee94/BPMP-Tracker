@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /Grid1
         - /Simulator1/Obstacle1
         - /GAR1/TF1
       Splitter Ratio: 0.5
@@ -36,7 +37,7 @@ Visualization Manager:
   Class: ""
   Displays:
     - Alpha: 0.5
-      Cell Size: 1
+      Cell Size: 1.6666666269302368
       Class: rviz/Grid
       Color: 0; 0; 0
       Enabled: true
@@ -180,7 +181,7 @@ Visualization Manager:
           Marker Topic: /bpmp_tracker/raw_primitive
           Name: RawPrimitives
           Namespaces:
-            TRACKER_RAW: true
+            {}
           Queue Size: 100
           Value: true
         - Alpha: 0.20000000298023224
@@ -202,7 +203,7 @@ Visualization Manager:
           Marker Topic: /bpmp_tracker/feasible_primitives
           Name: FeasiblePrimitives
           Namespaces:
-            {}
+            TRACKER_FEASIBLE: true
           Queue Size: 100
           Value: true
       Enabled: true
@@ -214,9 +215,39 @@ Visualization Manager:
       Namespaces:
         0: true
         1: true
+        10: true
+        11: true
+        12: true
+        13: true
+        14: true
+        15: true
+        16: true
+        17: true
+        18: true
+        19: true
         2: true
+        20: true
+        21: true
+        22: true
+        23: true
+        24: true
+        25: true
+        26: true
+        27: true
+        28: true
+        29: true
         3: true
+        30: true
+        31: true
+        32: true
+        33: true
+        34: true
         4: true
+        5: true
+        6: true
+        7: true
+        8: true
+        9: true
       Queue Size: 100
       Value: true
     - Alpha: 1

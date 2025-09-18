@@ -63,7 +63,7 @@ void bpmp::RosWrapper::PublishRosMsgs() {
             if (yaw_gap<0)
                 yaw_gap+=2.0*M_PI;
             yaw_gap -= M_PI;
-            zero_input.vel_angular= (1.0)*yaw_gap;
+            zero_input.vel_angular= (2.0)*yaw_gap;
             tracker_control_input_publisher_.publish(zero_input);
         }
         p_base_->mutex_set_[1].unlock();

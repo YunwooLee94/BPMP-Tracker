@@ -92,7 +92,7 @@ void bpmp::Simulator::Run() {
                         temp_distance_squared =
                                 pow(current_unicycle_state_.px - object_history_list_[obstacle_idx_list_[j]].px.front(), 2) +
                                 pow(current_unicycle_state_.py - object_history_list_[obstacle_idx_list_[j]].py.front(), 2);
-                        if (temp_distance_squared < 16*agent_size_ * agent_size_)
+                        if (temp_distance_squared < 9*agent_size_ * agent_size_)
                             is_okay_at_start = false;
                     }
                     if (is_okay_at_start){
@@ -251,7 +251,7 @@ bpmp::Simulator::Simulator() : nh_("~") {
                 temp_distance_squared =
                         pow(current_unicycle_state_.px - object_history_list_[obstacle_idx_list_[j]].px.front(), 2) +
                         pow(current_unicycle_state_.py - object_history_list_[obstacle_idx_list_[j]].py.front(), 2);
-                if (temp_distance_squared < 16*agent_size_ * agent_size_)
+                if (temp_distance_squared < 9*agent_size_ * agent_size_)
                     is_okay_at_start = false;
             }
             if (is_okay_at_start)

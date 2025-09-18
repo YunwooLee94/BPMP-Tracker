@@ -22,7 +22,7 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
     bool pass_test0 = true;
     if(visible_index_.empty()){
         pass_test0 = false;
-        cout<<"NO VISIBLE INDEX"<<endl;
+//        cout<<"NO VISIBLE INDEX"<<endl;
     }
     if(pass_test0){
         switch (EnvironmentMode()){
@@ -53,7 +53,7 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
         return false;
     bool pass_test1 = true;
     if(safe_index_.empty()){
-        cout<<"NO SAFE INDEX"<<endl;
+//        cout<<"NO SAFE INDEX"<<endl;
         pass_test1 = false;
     }
     if (pass_test1) {
