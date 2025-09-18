@@ -827,15 +827,16 @@ void bpmp::Tracker::GenerateCorridor() {
 //        start_point[1] = 2.0;
     vec_Vec3f segment;
     segment.push_back(start_point), segment.push_back(predicted_point);
-    EllipsoidDecomp3D decomp_util;
+    LineSegment3D decomp_util(start_point,predicted_point);
     decomp_util.set_obs(point_cloud_3d_);
     decomp_util.set_local_bbox(Vec3f(5.0, 5.0,1.0));
-    decomp_util.dilate(segment);
+    decomp_util.dilate(0.0);
     vec_E<Polyhedron3D> polys;
-    auto poly_hedrons = decomp_util.get_polyhedrons();
-    if(not poly_hedrons.empty()){
-        polys_.push_back(poly_hedrons[0]);
-        LinearConstraint3D corridor_constraint(0.5 * (start_point + predicted_point), poly_hedrons[0].hyperplanes());
+    auto poly_hedrons = decomp_util.get_polyhedron();
+    bool is_valid = ! poly_hedrons.hyperplanes().empty();
+    if(is_valid){
+        polys_.push_back(poly_hedrons);
+        LinearConstraint3D corridor_constraint(0.5 * (start_point + predicted_point), poly_hedrons.hyperplanes());
         corridor_constraints_=corridor_constraint;
     }
 }
