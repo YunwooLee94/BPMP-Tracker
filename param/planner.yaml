@@ -1,18 +1,18 @@
-control_frequency: 100.0
-planning_frequency: 25.0
+control_frequency: 50.0
+planning_frequency: 20.0
 horizon: 1.0
 num_thread: 4
 num_sample_planning: 1200 # 2000
 r_min: 0.8
 r_max: 1.2
 safe_distance: 0.01 # 0.05
-distance_max: 10.0 # 2.0
+distance_max: 2.5 # 2.0
 terminal_weight: 10.0
-vel_max: 100.0 # 2.0
-acc_max: 100.0 # 3.0
-ang_max: 100.0 # 2.09
+vel_max: 3.0 # 2.0
+acc_max: 6.0 # 3.0
+ang_max: 3.14 # 2.09
 fov: 2.09 #(120 degree)
-object_radius: 0.1
+object_radius: 0.3
 is_experiment: false
 is_unstructured: true
 sample_mode: 0 # 0: fov_considerd, 1 fov_not_considered
