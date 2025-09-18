@@ -311,7 +311,7 @@ void bpmp::RosWrapper::PclCallback(const sensor_msgs::PointCloud2_<std::allocato
         p_base_->is_obstacle_info_ = true;
         p_base_->is_pcl_received_ = true;
         p_base_->mutex_set_[0].unlock();
-        cout<<"GOT PCL FROM SIMULATOR"<<endl;
+        //cout<<"GOT PCL FROM SIMULATOR"<<endl;
     }
     else{
         p_base_->mutex_set_[0].lock();
