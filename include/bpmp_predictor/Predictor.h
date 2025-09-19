@@ -46,6 +46,10 @@ namespace bpmp{
         double GetCurrentTime(){return ros::Time::now().toSec()-t0_;};
         void TargetStateCallback(const bpmp_tracker::ObjectState &msg);
         void PclCallback(const sensor_msgs::PointCloud2::ConstPtr &pcl_msgs);
+        void ObstacleStateListCallback(const bpmp_tracker::ObjectStateList &msg);
+
+        bool is_pcl_received_{false};
+        bool is_dyn_obs_received_{false};
 
         bpmp::State current_target_state_;
         vector<bpmp::PrimitiveTarget> current_obstacle_primitive_list_;
@@ -61,8 +65,10 @@ namespace bpmp{
         void SampleEndPointsSubProcess(const int &start_idx, const int &end_idx, vector<Point> &endpoint_list_sub);
         void GeneratePrimitives();
         void GeneratePrimitivesSubProcess(const int &start_idx, const int &end_idx, vector<PrimitiveTarget> &primitive_sub);
-        void GetSafeIndex();
-        void GetSafeIndexUnstructuredSubProcess(const LinearConstraint3D &constraint, const int &start_idx, const int &end_idx, std::vector<uint> &safe_index_sub);
+        vector<bpmp::uint> GetSafeIndexUnstructured(const vector<bpmp::uint> &prior_idx);
+        void GetSafeIndexUnstructuredSubProcess(const LinearConstraint3D &constraint, const vector<uint> &prior_idx, const int &start_idx, const int &end_idx, std::vector<uint> &safe_index_sub);
+        vector<bpmp::uint> GetSafeIndexDynamic(const vector<bpmp::uint> &prior_idx);
+        void GetSafeIndexDynamicSubProcess(const vector<uint> &prior_idx, const int &start_idx, const int &end_idx, std::vector<uint> &safe_index_sub);
 
         LinearConstraint3D GenerateCorridor();
         void GetBestIndex();
@@ -70,6 +76,10 @@ namespace bpmp{
         uint best_prediction_index_;
         void UpdateResult();
         void EraseResult();
+
+
+        int EnvironmentMode();
+
     };
 }
 #endif //BPMP_TRACKER_PREDICTOR_H

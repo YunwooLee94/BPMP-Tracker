@@ -38,6 +38,8 @@ bpmp::Predictor::Predictor():nh_("~") {
     visualizer_.UpdateParameter(vis_param_);
     target_state_subscriber_ = nh_.subscribe("/bpmp_simulator/target_state", 1, &Predictor::TargetStateCallback, this);
     pcl_subscriber_ = nh_.subscribe("/bpmp_simulator/point_cloud_obstacle", 1, &Predictor::PclCallback, this);
+    obstacle_state_list_subscriber_ = nh_.subscribe("/bpmp_simulator/obstacle_state_list", 1,
+                                                    &Predictor::ObstacleStateListCallback, this);
 
     raw_primitive_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("TargetRawPrimitive", 1);
     feasible_primitive_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("TargetFeasiblePrimitive", 1);
@@ -73,7 +75,31 @@ void bpmp::Predictor::TargetStateCallback(const bpmp_tracker::ObjectState &msg) 
 bool bpmp::Predictor::Predict() {
     SampleEndPoints();
     GeneratePrimitives();
-    GetSafeIndex();
+    vector<bpmp::uint> id_array;
+    for(int i=0;i<param_.num_sample;i++)
+        id_array.push_back(i);
+    switch (EnvironmentMode()){
+        case 0:{
+            safe_index_.clear();
+            safe_index_ = GetSafeIndexUnstructured(id_array); // Target Distance + Collision and Occlusion Avoidance against Obstacles
+            break;
+        }
+        case 1:{
+            safe_index_.clear();
+            safe_index_ = GetSafeIndexDynamic(id_array);
+            break;
+        }
+        case 2:{
+            safe_index_.clear();
+            std::vector<uint> temp_safe_index = GetSafeIndexUnstructured(id_array);
+            safe_index_ = GetSafeIndexDynamic(temp_safe_index);
+            break;
+        }
+        default:{
+            cout<<"CheckModeERROR"<<endl;
+            return false;
+        }
+    }
     if (safe_index_.empty())
         return false;
     GetBestIndex();
@@ -199,27 +225,28 @@ void bpmp::Predictor::GeneratePrimitivesSubProcess(const int &start_idx, const i
     }
 }
 
-void bpmp::Predictor::GetSafeIndex() {
-    safe_index_.clear();
-    int num_chunk = primitive_.size() / param_.num_thread;
+std::vector<bpmp::uint> bpmp::Predictor::GetSafeIndexUnstructured(const vector<uint> &prior_idx) {
+    vector<bpmp::uint> index;
+    int num_chunk = prior_idx.size() / param_.num_thread;
     std::vector<thread> worker_thread;
     vector<vector<bpmp::uint>> safe_index_temp(param_.num_thread);
 
     LinearConstraint3D corridor_constraints = GenerateCorridor();
     for (int i = 0; i < param_.num_thread; i++)
         worker_thread.emplace_back(
-                thread(&Predictor::GetSafeIndexUnstructuredSubProcess, this, corridor_constraints,num_chunk * i, num_chunk * (i + 1),
+                thread(&Predictor::GetSafeIndexUnstructuredSubProcess, this, corridor_constraints,prior_idx, num_chunk * i, num_chunk * (i + 1),
                        std::ref(safe_index_temp[i])));
 
     for (int i = 0; i < param_.num_thread; i++)
         worker_thread[i].join();
     for (int i = 0; i < param_.num_thread; i++) {
         for (int j = 0; j < safe_index_temp[i].size(); j++)
-            safe_index_.push_back(safe_index_temp[i][j]);
+            index.push_back(safe_index_temp[i][j]);
     }
+    return index;
 }
 
-void bpmp::Predictor::GetSafeIndexUnstructuredSubProcess(const LinearConstraint3D &constraint, const int &start_idx,
+void bpmp::Predictor::GetSafeIndexUnstructuredSubProcess(const LinearConstraint3D &constraint, const vector<uint> &prior_idx, const int &start_idx,
                                                          const int &end_idx, std::vector<uint> &safe_index_sub) {
     Eigen::Vector3d A_comp_temp{0.0,0.0,0.0};
     double b_comp_temp(0.0);
@@ -245,7 +272,7 @@ void bpmp::Predictor::GetSafeIndexUnstructuredSubProcess(const LinearConstraint3
         for(int j =0;j<(int)LinearConstraintA.size();j++){
             flag_store_in = true;
             for(int k=0;k<4;k++){
-                value = LinearConstraintA[j][0]*primitive_[idx].ctrl_x[k]+LinearConstraintA[j][1]*primitive_[idx].ctrl_y[k]+LinearConstraintA[j][2]*primitive_[idx].ctrl_z[k]
+                value = LinearConstraintA[j][0]*primitive_[prior_idx[idx]].ctrl_x[k]+LinearConstraintA[j][1]*primitive_[prior_idx[idx]].ctrl_y[k]+LinearConstraintA[j][2]*primitive_[prior_idx[idx]].ctrl_z[k]
                         -LinearConstraintb[j]+param_.target_size;
                 if(value>0.0){
                     flag_store_in = false;
@@ -258,7 +285,7 @@ void bpmp::Predictor::GetSafeIndexUnstructuredSubProcess(const LinearConstraint3
             }
         }
         if (flag_store_in and flag_store_out)
-            safe_index_sub.push_back(bpmp::uint(idx));
+            safe_index_sub.push_back(prior_idx[idx]);
     }
 }
 
@@ -305,6 +332,11 @@ void bpmp::Predictor::GetBestIndexSubProcess(const int &start_idx, const int &en
 void bpmp::Predictor::PclCallback(const sensor_msgs::PointCloud2_<std::allocator<void>>::ConstPtr &pcl_msgs) {
     point_cloud_3d_.clear();
     sensor_msgs::PointCloud pcl;
+    if (not pcl_msgs->fields.empty())
+        is_pcl_received_ = true;
+    else
+        is_pcl_received_ = false;
+
     if (not pcl_msgs->fields.empty()) {
         sensor_msgs::convertPointCloud2ToPointCloud(*pcl_msgs, pcl);
         pcl.header.frame_id = pcl_msgs->header.frame_id;
@@ -329,4 +361,103 @@ LinearConstraint3D bpmp::Predictor::GenerateCorridor() {
     auto poly_hedrons = decomp_util.get_polyhedron();
     LinearConstraint3D corridor_constraint(temp_pose_eigen, poly_hedrons.hyperplanes());
     return corridor_constraint;
+}
+
+int bpmp::Predictor::EnvironmentMode() {
+        int mode = 0; // 0: unstructured static, 1: dynamic, 2: static+dynamic
+        if(is_dyn_obs_received_)
+            mode = 1;
+        if(is_pcl_received_ and is_dyn_obs_received_)
+            mode = 2;
+        //cout<<"MODE: "<<mode<<endl;
+        return mode;
+}
+
+void bpmp::Predictor::ObstacleStateListCallback(const bpmp_tracker::ObjectStateList &msg) {
+    bpmp::State obstacle_state;
+    current_obstacle_primitive_list_.clear();
+    if(msg.object_state_list.empty())
+        return;
+    PrimitiveTarget temp_primitive;
+    for (int i = 0; i < msg.object_state_list.size(); i++) {
+        obstacle_state.px = msg.object_state_list[i].px;
+        obstacle_state.py = msg.object_state_list[i].py;
+        obstacle_state.pz = msg.object_state_list[i].pz;
+        obstacle_state.vx = msg.object_state_list[i].vx;
+        obstacle_state.vy = msg.object_state_list[i].vy;
+        obstacle_state.vz = msg.object_state_list[i].vz;
+        temp_primitive.ctrl_x[0] = obstacle_state.px;
+        temp_primitive.ctrl_x[1] = obstacle_state.px+0.33333333*obstacle_state.vx*param_.horizon;
+        temp_primitive.ctrl_x[2] = obstacle_state.px+0.66666667*obstacle_state.vx*param_.horizon;
+        temp_primitive.ctrl_x[3] = obstacle_state.px+obstacle_state.vx*param_.horizon;
+        temp_primitive.ctrl_y[0] = obstacle_state.py;
+        temp_primitive.ctrl_y[1] = obstacle_state.py+0.33333333*obstacle_state.vy*param_.horizon;
+        temp_primitive.ctrl_y[2] = obstacle_state.py+0.66666667*obstacle_state.vy*param_.horizon;
+        temp_primitive.ctrl_y[3] = obstacle_state.py+obstacle_state.vy*param_.horizon;
+        temp_primitive.ctrl_z[0] = obstacle_state.pz;
+        temp_primitive.ctrl_z[1] = obstacle_state.pz+0.33333333*obstacle_state.vz*param_.horizon;
+        temp_primitive.ctrl_z[2] = obstacle_state.pz+0.66666667*obstacle_state.vz*param_.horizon;
+        temp_primitive.ctrl_z[3] = obstacle_state.pz+obstacle_state.vz*param_.horizon;
+        current_obstacle_primitive_list_.push_back(temp_primitive);
+    }
+}
+
+std::vector<bpmp::uint>  bpmp::Predictor::GetSafeIndexDynamic(const std::vector<uint> &prior_idx) {
+    vector<bpmp::uint> index;
+    int num_chunk = prior_idx.size() / param_.num_thread;
+    std::vector<thread> worker_thread;
+    vector<vector<bpmp::uint>> safe_index_temp(param_.num_thread);
+    for (int i = 0; i < param_.num_thread; i++)
+        worker_thread.emplace_back(
+                thread(&Predictor::GetSafeIndexDynamicSubProcess, this, prior_idx, num_chunk * i, num_chunk * (i + 1),
+                       std::ref(safe_index_temp[i])));
+
+    for (int i = 0; i < param_.num_thread; i++)
+        worker_thread[i].join();
+    for (int i = 0; i < param_.num_thread; i++) {
+        for (int j = 0; j < safe_index_temp[i].size(); j++)
+            index.push_back(safe_index_temp[i][j]);
+    }
+    return index;
+}
+
+void bpmp::Predictor::GetSafeIndexDynamicSubProcess(const std::vector<uint> &prior_idx, const int &start_idx,
+                                                    const int &end_idx, std::vector<uint> &safe_index_sub) {
+    double safe_distance_squared = pow(2 * param_.target_size, 2);
+    double relative_target_pos_x[4], relative_target_pos_y[4]; //obstacle-target
+    bool flag_store_in;
+    bool flag_store_out;
+
+    double value;
+    for (int idx = start_idx; idx < end_idx; idx++) {
+        flag_store_in = true;
+        flag_store_out = true;
+        for(int obs_idx=0;obs_idx<current_obstacle_primitive_list_.size();obs_idx++){
+            for (int j = 0; j < 4; j++) {
+                relative_target_pos_x[j] = primitive_[prior_idx[idx]].ctrl_x[j] - current_obstacle_primitive_list_[obs_idx].ctrl_x[j];
+                relative_target_pos_y[j] = primitive_[prior_idx[idx]].ctrl_y[j] - current_obstacle_primitive_list_[obs_idx].ctrl_y[j];
+            }
+            for (int j = 0; j <= 6; j++) {  // Collision between obstacle and tracker
+                value = 0.0f;
+                for (int k = std::max(0, j - 3); k <= std::min(3, j); k++) {
+                    value += (double) nchooser(3, k) * (double) nchooser(3, j - k) /
+                             (double) nchooser(6, j) *
+                             (relative_target_pos_x[k] * relative_target_pos_x[j - k] +
+                                     relative_target_pos_y[k] * relative_target_pos_y[j - k]
+                             );
+                }
+                if (value < safe_distance_squared) {
+                    flag_store_in = false;
+                    break;
+                }
+            }
+            if (not flag_store_in) {
+                flag_store_out = false;
+                break;
+            }
+        }
+        if(flag_store_out)
+            safe_index_sub.push_back(prior_idx[idx]);
+    }
+
 }

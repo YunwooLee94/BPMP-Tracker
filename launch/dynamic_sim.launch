@@ -6,8 +6,8 @@
     </group>
 
     <node pkg="bpmp_tracker" type="bpmp_simulator" name="bpmp_simulator" output="screen">
-        <rosparam command="load" file="$(find bpmp_tracker)/param/analysis/sim35.yaml"/>
-        <param name="object_history_file_name" value="$(find bpmp_tracker)/world/analysis/gar_2.csv"/>
+        <rosparam command="load" file="$(find bpmp_tracker)/param/analysis/sim25.yaml"/>
+        <param name="object_history_file_name" value="$(find bpmp_tracker)/world/analysis/gar_5.csv"/>
         <param name="initial_state_file_name" value="$(find bpmp_tracker)/world/analysis/initial_trajectory.txt"/>
     </node>
     <node pkg="bpmp_tracker" type="bpmp_predictor" name="bpmp_predictor" output="screen">
