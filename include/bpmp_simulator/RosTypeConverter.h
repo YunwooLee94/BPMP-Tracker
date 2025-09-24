@@ -70,6 +70,8 @@ namespace bpmp{
         ros::Publisher TargetPathMarkerPublisher_;
         ros::Publisher RobotPathMarkerPublisher_;
         ros::Publisher DynamicObstaclesMarkerPublisher_;
+	    ros::Publisher RobotMarkerPublisher_;
+	    ros::Publisher TargetMarkerPublisher_;
 
         // 누적 경로/마커 데이터
         nav_msgs::Path target_path_;
@@ -77,6 +79,8 @@ namespace bpmp{
         std::array<visualization_msgs::Marker,10> dyn_path_markers_;
         visualization_msgs::Marker target_path_marker_;
         visualization_msgs::Marker robot_path_marker_;
+        visualization_msgs::Marker target_vis_marker_;
+        visualization_msgs::Marker robot_vis_marker_;
         // 동적장애물 궤적 페이드 표현을 위한 포인트별 타임스탬프
         std::array<std::vector<ros::Time>,10> dyn_path_times_;
         // 오래된 포인트 알파 페이드 시간창 (초)

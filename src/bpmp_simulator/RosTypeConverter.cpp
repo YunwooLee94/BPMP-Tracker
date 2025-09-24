@@ -58,6 +58,8 @@ bpmp::RosTypeConverter::RosTypeConverter():nh_("~") {
     RobotPathPublisher_  = nh_.advertise<nav_msgs::Path>("/bpmp_simulator/robot_path", 1, true);
     TargetPathMarkerPublisher_ = nh_.advertise<visualization_msgs::Marker>("/bpmp_simulator/target_path_marker", 1, true);
     RobotPathMarkerPublisher_  = nh_.advertise<visualization_msgs::Marker>("/bpmp_simulator/robot_path_marker", 1, true);
+	RobotMarkerPublisher_ = nh_.advertise<visualization_msgs::Marker>("/bpmp_simulator/robot_vis",1);
+	TargetMarkerPublisher_ = nh_.advertise<visualization_msgs::Marker>("/bpmp_simulator/target_vis",1);
     // 동적장애물 궤적은 MarkerArray 대신 id별 Marker를 고정 id로 퍼블리시
     DynamicPathsPublisher_ = nh_.advertise<visualization_msgs::MarkerArray>("/bpmp_simulator/dynamic_paths", 1, true);
     DynamicObstaclesMarkerPublisher_ = nh_.advertise<visualization_msgs::MarkerArray>("/bpmp_simulator/dynamic_obstacles", 1);
@@ -87,6 +89,33 @@ bpmp::RosTypeConverter::RosTypeConverter():nh_("~") {
     robot_path_marker_.color.r = 0.0;
     robot_path_marker_.color.g = 0.0;
     robot_path_marker_.color.b = 1.0; // 파랑
+
+    target_vis_marker_.header.frame_id = "map";
+    target_vis_marker_.ns = "target_vis";
+    target_vis_marker_.id = 0;
+    target_vis_marker_.type = visualization_msgs::Marker::CYLINDER;
+    target_vis_marker_.action = visualization_msgs::Marker::ADD;
+    target_vis_marker_.scale.x = 0.6;
+    target_vis_marker_.scale.y = 0.6;
+    target_vis_marker_.scale.z = 1.0;
+    target_vis_marker_.color.a = 1.0;
+    target_vis_marker_.color.r = 0.0;
+    target_vis_marker_.color.g = 0.0;
+    target_vis_marker_.color.b = 1.0; // 파랑
+
+    robot_vis_marker_.header.frame_id = "map";
+    robot_vis_marker_.ns = "target_vis";
+    robot_vis_marker_.id = 0;
+    robot_vis_marker_.type = visualization_msgs::Marker::CYLINDER;
+    robot_vis_marker_.action = visualization_msgs::Marker::ADD;
+    robot_vis_marker_.scale.x = 0.6;
+    robot_vis_marker_.scale.y = 0.6;
+    robot_vis_marker_.scale.z = 1.0;
+    robot_vis_marker_.color.a = 1.0;
+    robot_vis_marker_.color.r = 1.0; // Red
+    robot_vis_marker_.color.g = 0.0;
+    robot_vis_marker_.color.b = 0.0;
+
 
     for (int i=0;i<10;++i){
         auto &m = dyn_path_markers_[i];
@@ -139,6 +168,15 @@ void bpmp::RosTypeConverter::TargtPositionCallback(const geometry_msgs::PoseStam
     target_path_.header.stamp = ps.header.stamp;
     target_path_.poses.push_back(ps);
     target_path_times_.push_back(ps.header.stamp);
+
+    target_vis_marker_.pose.position.x = msg->pose.position.x;
+    target_vis_marker_.pose.position.y = msg->pose.position.y;
+    target_vis_marker_.pose.position.z = msg->pose.position.z;
+    target_vis_marker_.pose.orientation.w = 1.0;
+    target_vis_marker_.pose.orientation.x = 0.0;
+    target_vis_marker_.pose.orientation.y = 0.0;
+    target_vis_marker_.pose.orientation.z = 0.0;
+    TargetMarkerPublisher_.publish(target_vis_marker_);
 
     geometry_msgs::Point p;
     p.x = ps.pose.position.x;
@@ -236,6 +274,15 @@ void bpmp::RosTypeConverter::RobotOdometryCallback(const nav_msgs::OdometryConst
     temp_msg.header.frame_id = "map";
     temp_msg.header.stamp = ros::Time::now();
     RobotOdometryPublisher_.publish(temp_msg);
+
+    robot_vis_marker_.pose.position.x = msg->pose.pose.position.x;
+    robot_vis_marker_.pose.position.y = msg->pose.pose.position.y;
+    robot_vis_marker_.pose.position.z = msg->pose.pose.position.z;
+    robot_vis_marker_.pose.orientation.w = 1.0;
+    robot_vis_marker_.pose.orientation.x = 0.0;
+    robot_vis_marker_.pose.orientation.y = 0.0;
+    robot_vis_marker_.pose.orientation.z = 0.0;
+    RobotMarkerPublisher_.publish(robot_vis_marker_);
 
     // 누적 경로 추가 (Path + Marker)
     geometry_msgs::PoseStamped ps;
