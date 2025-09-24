@@ -9,6 +9,9 @@ Panels:
         - /Simulator1/Obstacle1
         - /Predictor1
         - /GAR1
+        - /GAR1/RawPrimitives1
+        - /GAR1/FeasiblePrimitives1
+        - /PolyhedronArray1
       Splitter Ratio: 0.5
     Tree Height: 719
   - Class: rviz/Selection
@@ -61,7 +64,7 @@ Visualization Manager:
           Marker Topic: /bpmp_simulator/pcl_boxes
           Name: Obstacle
           Namespaces:
-            PCL_OBSTACLE: true
+            {}
           Queue Size: 1
           Value: true
         - Class: rviz/Marker
@@ -69,8 +72,60 @@ Visualization Manager:
           Marker Topic: /bpmp_simulator/target_vis
           Name: Target
           Namespaces:
-            Target: true
+            {}
           Queue Size: 100
+          Value: true
+        - Class: rviz/PointCloud2
+          Enabled: true
+          Name: PCL
+          Queue Size: 10
+          Topic: /bpmp_simulator/point_cloud_obstacle
+          Unreliable: false
+          Style: Points
+          Size (Pixels): 3
+          Color Transformer: FlatColor
+          Color: 50; 50; 50
+          Decay Time: 0
+          Value: true
+        - Class: rviz/MarkerArray
+          Enabled: true
+          Marker Topic: /bpmp_simulator/dynamic_paths
+          Name: DynamicPaths
+          Namespaces:
+            {}
+          Queue Size: 10
+          Value: true
+        - Class: rviz/MarkerArray
+          Enabled: true
+          Marker Topic: /bpmp_simulator/dynamic_obstacles
+          Name: DynamicObstacles
+          Namespaces:
+            {}
+          Queue Size: 10
+          Value: true
+        - Class: rviz/Path
+          Enabled: true
+          Name: TargetPath
+          Topic: /bpmp_simulator/target_path
+          Color: 255; 0; 0
+          Alpha: 1
+          Buffer Length: 1
+          Pose Style: None
+          Line Style: Billboards
+          Line Width: 0.3
+          Queue Size: 10
+          Value: true
+        - Class: rviz/Path
+          Enabled: true
+          Name: RobotPath
+          Topic: /bpmp_simulator/robot_path
+          Color: 0; 0; 255
+          Alpha: 1
+          Buffer Length: 1
+          Pose Style: None
+          Line Style: Billboards
+          Line Width: 0.3
+          Queue Size: 10
           Value: true
       Enabled: true
       Name: Simulator
@@ -160,9 +215,23 @@ Visualization Manager:
           Frame Timeout: 15
           Frames:
             All Enabled: true
+            b:
+              Value: true
+            base_leftcamera:
+              Value: true
+            base_link:
+              Value: true
+            base_rightcamera:
+              Value: true
             current:
               Value: true
+            leftcamera_optical_link:
+              Value: true
             map:
+              Value: true
+            odom:
+              Value: true
+            rightcamera_optical_link:
               Value: true
           Marker Alpha: 1
           Marker Scale: 1
@@ -174,20 +243,30 @@ Visualization Manager:
             map:
               current:
                 {}
+              odom:
+                base_link:
+                  b:
+                    {}
+                  base_leftcamera:
+                    leftcamera_optical_link:
+                      {}
+                  base_rightcamera:
+                    rightcamera_optical_link:
+                      {}
           Update Interval: 0
           Value: true
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /bpmp_tracker/raw_primitive
+          Marker Topic: /bpmp_tracker/best_primitives
           Name: RawPrimitives
           Namespaces:
-            {}
+            TRACKER_BEST: true
           Queue Size: 100
           Value: true
         - Alpha: 0.20000000298023224
           BoundColor: 255; 0; 0
           Class: decomp_rviz_plugins/PolyhedronArray
-          Enabled: true
+          Enabled: false
           MeshColor: 0; 170; 255
           Name: PolyhedronArray
           Queue Size: 1
@@ -195,7 +274,7 @@ Visualization Manager:
           State: Mesh
           Topic: /bpmp_tracker/corridor
           Unreliable: false
-          Value: true
+          Value: false
           VsColor: 0; 255; 0
           VsScale: 1
         - Class: rviz/MarkerArray
@@ -208,6 +287,68 @@ Visualization Manager:
           Value: true
       Enabled: true
       Name: GAR
+    - Alpha: 0.20000000298023224
+      BoundColor: 255; 0; 0
+      Class: decomp_rviz_plugins/PolyhedronArray
+      Enabled: false
+      MeshColor: 192; 28; 40
+      Name: PolyhedronArray
+      Queue Size: 10
+      Scale: 0.10000000149011612
+      State: Mesh
+      Topic: /bpmp_predictor/corridor
+      Unreliable: false
+      Value: false
+      VsColor: 0; 255; 0
+      VsScale: 1
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Queue Size: 10
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic: /airsim/object/dynamic_10/pose
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Queue Size: 10
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic: /airsim/object/dynamic_2/pose
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Queue Size: 10
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic: /airsim/object/dynamic_10/pose
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -236,7 +377,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 10.476326942443848
+      Distance: 26.750808715820312
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -252,17 +393,17 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8897968530654907
+      Pitch: 0.8747966885566711
       Target Frame: current
-      Yaw: 4.533174514770508
+      Yaw: 1.6981717348098755
     Saved: ~
 Window Geometry:
   Displays:
-    collapsed: false
-  Height: 1016
-  Hide Left Dock: false
-  Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000001560000035afc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d0000035a000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c0000026100000001000001000000035afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003d0000035a000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007380000003efc0100000002fb0000000800540069006d0065010000000000000738000003bc00fffffffb0000000800540069006d00650100000000000004500000000000000000000004d60000035a00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+    collapsed: true
+  Height: 1025
+  Hide Left Dock: true
+  Hide Right Dock: true
+  QMainWindow State: 000000ff00000000fd0000000400000000000001560000035afc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003d0000035a000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c0000026100000001000001000000035afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000035a000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000005110000003efc0100000002fb0000000800540069006d0065010000000000000511000003cc00fffffffb0000000800540069006d00650100000000000004500000000000000000000005110000036300000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -270,7 +411,7 @@ Window Geometry:
   Tool Properties:
     collapsed: false
   Views:
-    collapsed: false
-  Width: 1848
-  X: 72
-  Y: 27
+    collapsed: true
+  Width: 1297
+  X: 3138
+  Y: 147

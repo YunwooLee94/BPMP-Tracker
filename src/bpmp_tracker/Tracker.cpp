@@ -550,6 +550,9 @@ std::vector<uint> bpmp::Tracker::GetSafeIndexDynamic(const std::vector<uint> &in
         for (int k = 0; k < safe_index_temp[j].size(); k++)
             feasible_index.push_back(safe_index_temp[j][k]);
     }
+    std::cout << "[GetSafeIndexDynamic] input: " << index.size()
+              << " -> output: " << feasible_index.size() << std::endl;
+
     return feasible_index;
 }
 std::vector<bpmp::uint> bpmp::Tracker::GetSafeIndexUnstructured(const vector<bpmp::uint> &index) {

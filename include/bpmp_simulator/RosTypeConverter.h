@@ -24,6 +24,9 @@
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+#include <nav_msgs/Path.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 
 namespace bpmp{
@@ -60,6 +63,20 @@ namespace bpmp{
         };
         std::array<ObstacleTracker,10> dyn_;     // 10개 장애물 버퍼
         
+        // 누적 경로/마커 퍼블리셔
+        ros::Publisher TargetPathPublisher_;
+        ros::Publisher RobotPathPublisher_;
+        ros::Publisher DynamicPathsPublisher_;
+        ros::Publisher TargetPathMarkerPublisher_;
+        ros::Publisher RobotPathMarkerPublisher_;
+        ros::Publisher DynamicObstaclesMarkerPublisher_;
+
+        // 누적 경로/마커 데이터
+        nav_msgs::Path target_path_;
+        nav_msgs::Path robot_path_;
+        std::array<visualization_msgs::Marker,10> dyn_path_markers_;
+        visualization_msgs::Marker target_path_marker_;
+        visualization_msgs::Marker robot_path_marker_;
 
 
         using Policy5 = message_filters::sync_policies::ApproximateTime<

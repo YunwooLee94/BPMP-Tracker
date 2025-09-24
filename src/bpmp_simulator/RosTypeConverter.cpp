@@ -8,6 +8,9 @@
 #include <tf/transform_listener.h> 
 #include <pcl_ros/transforms.h> 
 #include <pcl_ros/point_cloud.h>
+#include <nav_msgs/Path.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 
 bpmp::RosTypeConverter::RosTypeConverter():nh_("~") {
@@ -48,6 +51,55 @@ bpmp::RosTypeConverter::RosTypeConverter():nh_("~") {
 
     DynamicObstaclesPublisher_ = nh_.advertise<bpmp_tracker::ObjectStateList>("/bpmp_simulator/obstacle_state_list", 1);
 
+    // 누적 경로 퍼블리셔 (Path + Marker)
+    TargetPathPublisher_ = nh_.advertise<nav_msgs::Path>("/bpmp_simulator/target_path", 1, true);
+    RobotPathPublisher_  = nh_.advertise<nav_msgs::Path>("/bpmp_simulator/robot_path", 1, true);
+    TargetPathMarkerPublisher_ = nh_.advertise<visualization_msgs::Marker>("/bpmp_simulator/target_path_marker", 1, true);
+    RobotPathMarkerPublisher_  = nh_.advertise<visualization_msgs::Marker>("/bpmp_simulator/robot_path_marker", 1, true);
+    // 동적장애물 궤적은 MarkerArray 대신 id별 Marker를 고정 id로 퍼블리시
+    DynamicPathsPublisher_ = nh_.advertise<visualization_msgs::MarkerArray>("/bpmp_simulator/dynamic_paths", 1, true);
+    DynamicObstaclesMarkerPublisher_ = nh_.advertise<visualization_msgs::MarkerArray>("/bpmp_simulator/dynamic_obstacles", 1);
+
+    // 초기 header와 스타일 설정
+    target_path_.header.frame_id = "map";
+    robot_path_.header.frame_id  = "map";
+
+    target_path_marker_.header.frame_id = "map";
+    target_path_marker_.ns = "target_path";
+    target_path_marker_.id = 0;
+    target_path_marker_.type = visualization_msgs::Marker::LINE_STRIP;
+    target_path_marker_.action = visualization_msgs::Marker::ADD;
+    target_path_marker_.scale.x = 0.3; // 두께(증가)
+    target_path_marker_.color.a = 1.0;
+    target_path_marker_.color.r = 1.0; // 빨강
+    target_path_marker_.color.g = 0.0;
+    target_path_marker_.color.b = 0.0;
+
+    robot_path_marker_.header.frame_id = "map";
+    robot_path_marker_.ns = "robot_path";
+    robot_path_marker_.id = 0;
+    robot_path_marker_.type = visualization_msgs::Marker::LINE_STRIP;
+    robot_path_marker_.action = visualization_msgs::Marker::ADD;
+    robot_path_marker_.scale.x = 0.3;
+    robot_path_marker_.color.a = 1.0;
+    robot_path_marker_.color.r = 0.0;
+    robot_path_marker_.color.g = 0.0;
+    robot_path_marker_.color.b = 1.0; // 파랑
+
+    for (int i=0;i<10;++i){
+        auto &m = dyn_path_markers_[i];
+        m.header.frame_id = "map";
+        m.ns = "dyn_path";
+        m.id = i;
+        m.type = visualization_msgs::Marker::LINE_STRIP;
+        m.action = visualization_msgs::Marker::ADD;
+        m.scale.x = 0.3;
+        m.color.a = 1.0;
+        m.color.r = 0.0;
+        m.color.g = 1.0; // 초록
+        m.color.b = 0.0;
+    }
+
     for (int i=0; i<10; ++i) {
         subDyn_[i].reset(new message_filters::Subscriber<geometry_msgs::PoseStamped>(nh_, dynamic_topics_[i], queue_size_));
       }
@@ -76,6 +128,28 @@ void bpmp::RosTypeConverter::Run() {
 void bpmp::RosTypeConverter::TargtPositionCallback(const geometry_msgs::PoseStampedConstPtr &msg) {
     double curr_time = curTime();
     float z_offset = 0.5;
+    // 누적 경로 추가 (Path + Marker)
+    geometry_msgs::PoseStamped ps;
+    ps.header.stamp = ros::Time::now();
+    ps.header.frame_id = "map";
+    ps.pose = msg->pose;
+    ps.pose.position.z += z_offset;
+    target_path_.header.stamp = ps.header.stamp;
+    target_path_.poses.push_back(ps);
+
+    geometry_msgs::Point p;
+    p.x = ps.pose.position.x;
+    p.y = ps.pose.position.y;
+    p.z = ps.pose.position.z;
+    target_path_marker_.header.stamp = ps.header.stamp;
+    target_path_marker_.points.push_back(p);
+
+    if (TargetPathPublisher_.getNumSubscribers() > 0)
+        TargetPathPublisher_.publish(target_path_);
+    if (TargetPathMarkerPublisher_.getNumSubscribers() > 0)
+        TargetPathMarkerPublisher_.publish(target_path_marker_);
+
+    // 기존 속도 추정 로직
     if(not is_target_position_received_){
         current_target_state_.px = msg->pose.position.x;
         current_target_state_.py = msg->pose.position.y;
@@ -138,6 +212,26 @@ void bpmp::RosTypeConverter::RobotOdometryCallback(const nav_msgs::OdometryConst
     temp_msg.header.frame_id = "map";
     temp_msg.header.stamp = ros::Time::now();
     RobotOdometryPublisher_.publish(temp_msg);
+
+    // 누적 경로 추가 (Path + Marker)
+    geometry_msgs::PoseStamped ps;
+    ps.header = temp_msg.header;
+    ps.pose = temp_msg.pose.pose;
+    robot_path_.header.stamp = ps.header.stamp;
+    robot_path_.poses.push_back(ps);
+
+    geometry_msgs::Point p;
+    p.x = ps.pose.position.x;
+    p.y = ps.pose.position.y;
+    p.z = ps.pose.position.z;
+    robot_path_marker_.header.stamp = ps.header.stamp;
+    robot_path_marker_.points.push_back(p);
+
+    if (RobotPathPublisher_.getNumSubscribers() > 0)
+        RobotPathPublisher_.publish(robot_path_);
+    if (RobotPathMarkerPublisher_.getNumSubscribers() > 0)
+        RobotPathMarkerPublisher_.publish(robot_path_marker_);
+
     transform.setOrigin(tf::Vector3(msg->pose.pose.position.x,msg->pose.pose.position.y,msg->pose.pose.position.z));
     tf::Quaternion q(msg->pose.pose.orientation.x,msg->pose.pose.orientation.y,msg->pose.pose.orientation.z,msg->pose.pose.orientation.w);
     transform.setRotation(q);
@@ -262,6 +356,42 @@ void bpmp::RosTypeConverter::TryMergeAndPublish() {
   list_msg.object_state_list.reserve(10);
   for (const auto& s : last_groupA_) list_msg.object_state_list.push_back(s);
   for (const auto& s : last_groupB_) list_msg.object_state_list.push_back(s);
+
+  // 동적장애물 궤적 누적 (MarkerArray)
+  visualization_msgs::MarkerArray arr;
+  arr.markers.reserve(10);
+  const ros::Time now = ros::Time::now();
+  for (int i=0;i<10;++i){
+      auto &m = dyn_path_markers_[i];
+      m.header.stamp = now;
+      geometry_msgs::Point p; p.x = list_msg.object_state_list[i].px; p.y = list_msg.object_state_list[i].py; p.z = list_msg.object_state_list[i].pz;
+      m.points.push_back(p);
+      arr.markers.push_back(m);
+  }
+  if (DynamicPathsPublisher_.getNumSubscribers() > 0)
+      DynamicPathsPublisher_.publish(arr);
+
+  // 동적장애물 현재 위치 마커 (초록색 구)
+  visualization_msgs::MarkerArray obs;
+  obs.markers.reserve(10);
+  for (int i=0;i<10;++i){
+      visualization_msgs::Marker sphere;
+      sphere.header.frame_id = "map";
+      sphere.header.stamp = now;
+      sphere.ns = "dyn_obs";
+      sphere.id = i;
+      sphere.type = visualization_msgs::Marker::CYLINDER;
+      sphere.action = visualization_msgs::Marker::ADD;
+      sphere.scale.x = 1.0; sphere.scale.y = 1.0; sphere.scale.z = 2.0;
+      sphere.color.a = 1.0; sphere.color.r = 0.0; sphere.color.g = 1.0; sphere.color.b = 0.0;
+      sphere.pose.orientation.w = 1.0;
+      sphere.pose.position.x = list_msg.object_state_list[i].px;
+      sphere.pose.position.y = list_msg.object_state_list[i].py;
+      sphere.pose.position.z = list_msg.object_state_list[i].pz;
+      obs.markers.push_back(sphere);
+  }
+  if (DynamicObstaclesMarkerPublisher_.getNumSubscribers() > 0)
+      DynamicObstaclesMarkerPublisher_.publish(obs);
 
   DynamicObstaclesPublisher_.publish(list_msg);
 }
