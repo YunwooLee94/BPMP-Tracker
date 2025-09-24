@@ -20,6 +20,7 @@
         <remap from="/points_masked" to="/airsim/lopcl"/>
         <!-- <remap from="/base_odom" to="/airsim/odom"/> -->
         <remap from="/move_base/cmd_vel" to="/airsim/carcontrol"/>
+        <param name="path_fade_window_sec" value="15.0"/>
         <rosparam param="object_poses_individual_topics">
             [/airsim/object/dynamic_1/pose,
             /airsim/object/dynamic_2/pose,

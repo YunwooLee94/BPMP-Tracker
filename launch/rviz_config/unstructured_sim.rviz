@@ -104,7 +104,7 @@ Visualization Manager:
           Queue Size: 10
           Value: true
         - Class: rviz/Path
-          Enabled: true
+          Enabled: false
           Name: TargetPath
           Topic: /bpmp_simulator/target_path
           Color: 255; 0; 0
@@ -114,9 +114,9 @@ Visualization Manager:
           Line Style: Billboards
           Line Width: 0.3
           Queue Size: 10
-          Value: true
+          Value: false
         - Class: rviz/Path
-          Enabled: true
+          Enabled: false
           Name: RobotPath
           Topic: /bpmp_simulator/robot_path
           Color: 0; 0; 255
@@ -125,6 +125,22 @@ Visualization Manager:
           Pose Style: None
           Line Style: Billboards
           Line Width: 0.3
+          Queue Size: 10
+          Value: false
+        - Class: rviz/Marker
+          Enabled: true
+          Marker Topic: /bpmp_simulator/target_path_marker
+          Name: TargetPathMarker
+          Namespaces:
+            target_path: true
+          Queue Size: 10
+          Value: true
+        - Class: rviz/Marker
+          Enabled: true
+          Marker Topic: /bpmp_simulator/robot_path_marker
+          Name: RobotPathMarker
+          Namespaces:
+            robot_path: true
           Queue Size: 10
           Value: true
       Enabled: true

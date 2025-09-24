@@ -33,6 +33,8 @@ bpmp::RosTypeConverter::RosTypeConverter():nh_("~") {
     nh_.param("dynamic_sync_slop",  sync_slop_sec_, 0.1);
     nh_.param("dynamic_queue_size", queue_size_, 10);
     nh_.param("dynamic_z_offset",   dynamic_z_offset_, 0.0);
+    // 경로 시각화 페이드 윈도우(초)
+    nh_.param("path_fade_window_sec", dyn_path_fade_window_sec_, dyn_path_fade_window_sec_);
 
     if (dynamic_topics_.size() != 10) {
         ROS_FATAL_STREAM("Expected 10 dynamic topics but got " << dynamic_topics_.size() << ". Please provide 10.");
@@ -136,6 +138,7 @@ void bpmp::RosTypeConverter::TargtPositionCallback(const geometry_msgs::PoseStam
     ps.pose.position.z += z_offset;
     target_path_.header.stamp = ps.header.stamp;
     target_path_.poses.push_back(ps);
+    target_path_times_.push_back(ps.header.stamp);
 
     geometry_msgs::Point p;
     p.x = ps.pose.position.x;
@@ -143,6 +146,27 @@ void bpmp::RosTypeConverter::TargtPositionCallback(const geometry_msgs::PoseStam
     p.z = ps.pose.position.z;
     target_path_marker_.header.stamp = ps.header.stamp;
     target_path_marker_.points.push_back(p);
+    // 페이드 적용: 오래된 점일수록 투명
+    // 오래된 포인트 제거 (윈도우: dyn_path_fade_window_sec_)
+    {
+        const ros::Time now_ts = ps.header.stamp;
+        const double window = dyn_path_fade_window_sec_;
+        size_t start_idx = 0;
+        while (start_idx < target_path_times_.size() && (now_ts - target_path_times_[start_idx]).toSec() > window) {
+            start_idx++;
+        }
+        if (start_idx > 0) {
+            target_path_times_.erase(target_path_times_.begin(), target_path_times_.begin()+start_idx);
+            target_path_marker_.points.erase(target_path_marker_.points.begin(), target_path_marker_.points.begin()+start_idx);
+            if (!target_path_marker_.colors.empty()) target_path_marker_.colors.erase(target_path_marker_.colors.begin(), target_path_marker_.colors.begin()+start_idx);
+        }
+    }
+    // 색 재설정 (빨강, 불투명)
+    target_path_marker_.colors.resize(target_path_marker_.points.size());
+    for (size_t i=0;i<target_path_marker_.points.size();++i){
+        std_msgs::ColorRGBA c; c.r = 1.0f; c.g = 0.0f; c.b = 0.0f; c.a = 1.0f;
+        target_path_marker_.colors[i] = c;
+    }
 
     if (TargetPathPublisher_.getNumSubscribers() > 0)
         TargetPathPublisher_.publish(target_path_);
@@ -219,6 +243,7 @@ void bpmp::RosTypeConverter::RobotOdometryCallback(const nav_msgs::OdometryConst
     ps.pose = temp_msg.pose.pose;
     robot_path_.header.stamp = ps.header.stamp;
     robot_path_.poses.push_back(ps);
+    robot_path_times_.push_back(ps.header.stamp);
 
     geometry_msgs::Point p;
     p.x = ps.pose.position.x;
@@ -226,6 +251,26 @@ void bpmp::RosTypeConverter::RobotOdometryCallback(const nav_msgs::OdometryConst
     p.z = ps.pose.position.z;
     robot_path_marker_.header.stamp = ps.header.stamp;
     robot_path_marker_.points.push_back(p);
+    // 오래된 포인트 제거 (윈도우: dyn_path_fade_window_sec_)
+    {
+        const ros::Time now_ts = ps.header.stamp;
+        const double window = dyn_path_fade_window_sec_;
+        size_t start_idx = 0;
+        while (start_idx < robot_path_times_.size() && (now_ts - robot_path_times_[start_idx]).toSec() > window) {
+            start_idx++;
+        }
+        if (start_idx > 0) {
+            robot_path_times_.erase(robot_path_times_.begin(), robot_path_times_.begin()+start_idx);
+            robot_path_marker_.points.erase(robot_path_marker_.points.begin(), robot_path_marker_.points.begin()+start_idx);
+            if (!robot_path_marker_.colors.empty()) robot_path_marker_.colors.erase(robot_path_marker_.colors.begin(), robot_path_marker_.colors.begin()+start_idx);
+        }
+    }
+    // 색 재설정 (파랑, 불투명)
+    robot_path_marker_.colors.resize(robot_path_marker_.points.size());
+    for (size_t i=0;i<robot_path_marker_.points.size();++i){
+        std_msgs::ColorRGBA c; c.r = 0.0f; c.g = 0.0f; c.b = 1.0f; c.a = 1.0f;
+        robot_path_marker_.colors[i] = c;
+    }
 
     if (RobotPathPublisher_.getNumSubscribers() > 0)
         RobotPathPublisher_.publish(robot_path_);
@@ -366,6 +411,28 @@ void bpmp::RosTypeConverter::TryMergeAndPublish() {
       m.header.stamp = now;
       geometry_msgs::Point p; p.x = list_msg.object_state_list[i].px; p.y = list_msg.object_state_list[i].py; p.z = list_msg.object_state_list[i].pz;
       m.points.push_back(p);
+      dyn_path_times_[i].push_back(now);
+
+      // 오래된 포인트 제거 (윈도우: dyn_path_fade_window_sec_)
+      const double window = dyn_path_fade_window_sec_;
+      size_t start_idx = 0;
+      while (start_idx < dyn_path_times_[i].size() && (now - dyn_path_times_[i][start_idx]).toSec() > window) {
+          start_idx++;
+      }
+      if (start_idx > 0) {
+          dyn_path_times_[i].erase(dyn_path_times_[i].begin(), dyn_path_times_[i].begin()+start_idx);
+          m.points.erase(m.points.begin(), m.points.begin()+start_idx);
+          if (!m.colors.empty()) m.colors.erase(m.colors.begin(), m.colors.begin()+start_idx);
+      }
+
+      // colors를 포인트 수에 맞춰 시간 기반 알파(초록)로 세팅: 최신=불투명, 오래됨=투명
+      m.colors.resize(m.points.size());
+      for (size_t k=0; k<m.points.size(); ++k){
+          const double age = (now - dyn_path_times_[i][k]).toSec();
+          double a = 1.0 - std::min(1.0, std::max(0.0, age / window));
+          std_msgs::ColorRGBA c; c.r = 0.0f; c.g = 1.0f; c.b = 0.0f; c.a = static_cast<float>(a);
+          m.colors[k] = c;
+      }
       arr.markers.push_back(m);
   }
   if (DynamicPathsPublisher_.getNumSubscribers() > 0)

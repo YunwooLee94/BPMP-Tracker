@@ -77,6 +77,13 @@ namespace bpmp{
         std::array<visualization_msgs::Marker,10> dyn_path_markers_;
         visualization_msgs::Marker target_path_marker_;
         visualization_msgs::Marker robot_path_marker_;
+        // 동적장애물 궤적 페이드 표현을 위한 포인트별 타임스탬프
+        std::array<std::vector<ros::Time>,10> dyn_path_times_;
+        // 오래된 포인트 알파 페이드 시간창 (초)
+        double dyn_path_fade_window_sec_{5.0};
+        // 타겟/로봇 경로 포인트 타임스탬프 (페이드용)
+        std::vector<ros::Time> target_path_times_;
+        std::vector<ros::Time> robot_path_times_;
 
 
         using Policy5 = message_filters::sync_policies::ApproximateTime<
