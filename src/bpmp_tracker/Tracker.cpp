@@ -22,7 +22,7 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
     bool pass_test0 = true;
     if(visible_index_.empty()){
         pass_test0 = false;
-//        cout<<"NO VISIBLE INDEX"<<endl;
+        cout<<"NO VISIBLE INDEX"<<endl;
     }
     if(pass_test0){
         switch (EnvironmentMode()){
@@ -556,8 +556,10 @@ std::vector<bpmp::uint> bpmp::Tracker::GetSafeIndexUnstructured(const vector<bpm
     vector<bpmp::uint> feasible_index;
     // Generate Corridor
     GenerateCorridor();
-    if(polys_.empty())
+    if(polys_.empty()) {
+        cout<<"No safe Corridor Generated!"<<endl;
         return feasible_index;
+    }
     // SafeIndexUnstructured
     int num_chunk = index.size() / param_.num_thread;
     vector<thread> worker_thread;

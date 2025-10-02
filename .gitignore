@@ -1,0 +1,8 @@
+.vscode/
+.vscode/*
+/tmp
+*.pdf
+*.mp4
+*.OBJ
+*.bag
+*.pkl
