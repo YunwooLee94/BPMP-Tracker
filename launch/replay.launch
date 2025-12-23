@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="rviz_display" default="true"/>
+    <group if = "$(arg rviz_display)">
+        <node name="rviz" pkg="rviz" type="rviz" args="-d $(find bpmp_tracker)/launch/rviz_config/replay.rviz" output="log"/>
+    </group>
+    <arg name="play_bag" default="true"/>
+    <arg name="bag_file_name" default="$(find bpmp_tracker)/bag/large_space.bag"/>
+    <group if="$(arg play_bag)">
+        <node name="ros_bag_play" pkg="rosbag" type="play" args="--clock -r 1.0 -s 0.0 $(arg bag_file_name)"/>
+    </group>
+
+    <!--    <node pkg="bpmp_tracker" type="bpmp_simulator" name="bpmp_simulator" output="screen">-->
+<!--        <rosparam command="load" file="$(find bpmp_tracker)/param/analysis/sim35.yaml"/>-->
+<!--        <param name="object_history_file_name" value="$(find bpmp_tracker)/world/analysis/gar_5.csv"/>-->
+<!--        <param name="initial_state_file_name" value="$(find bpmp_tracker)/world/analysis/initial_trajectory.txt"/>-->
+<!--    </node>-->
+<!--    <node pkg="bpmp_tracker" type="bpmp_predictor" name="bpmp_predictor" output="screen">-->
+<!--        <rosparam command="load" file="$(find bpmp_tracker)/param/predictor.yaml"/>-->
+<!--        <rosparam command="load" file="$(find bpmp_tracker)/param/prediction_visualizer.yaml"/>-->
+<!--    </node>-->
+<!--    <node pkg="bpmp_tracker" type="bpmp_tracker" name="bpmp_tracker" output="screen">-->
+<!--        <rosparam command="load" file="$(find bpmp_tracker)/param/analysis/planner.yaml"/>-->
+<!--        <rosparam command="load" file="$(find bpmp_tracker)/param/planning_visualizer.yaml"/>-->
+<!--    </node>-->
+
+</launch>

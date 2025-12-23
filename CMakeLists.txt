@@ -1,9 +1,15 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(bpmp_tracker)
 
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++14")
+#set(CMAKE_BUILD_TYPE Release)
+##set(CMAKE_BUILD_TYPE Debug)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++14")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE")
 set(CMAKE_BUILD_TYPE Release)
-#set(CMAKE_BUILD_TYPE Debug)
+
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -38,14 +44,15 @@ catkin_package(
 )
 
 file(GLOB BPMP_UTILS_SRC src/bpmp_utils/BernsteinUtils.cpp src/bpmp_utils/Utils.cpp)
-file(GLOB BPMP_SIMULATOR_SRC src/bpmp_simulator/*.cpp)
+file(GLOB BPMP_SIMULATOR_SRC src/bpmp_simulator/Simulator.cpp)
+file(GLOB BPMP_ROSTYPE_SRC src/bpmp_simulator/RosTypeConverter.cpp)
 file(GLOB BPMP_PREDICTOR_SRC src/bpmp_predictor/*.cpp exe/main_predictor.cpp)
 file(GLOB BPMP_TRACKER_SRC src/bpmp_tracker/Wrapper.cpp src/bpmp_tracker/PlannerBase.cpp src/bpmp_tracker/Tracker.cpp src/bpmp_tracker/PlanningVisualizer.cpp src/bpmp_tracker/RosWrapper.cpp )
 
 add_executable(bpmp_simulator exe/main_simulator.cpp ${BPMP_SIMULATOR_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(bpmp_simulator ${catkin_LIBRARIES} -lstdc++fs)
 
-add_executable(bpmp_ros_type_converter exe/main_type_converter.cpp ${BPMP_SIMULATOR_SRC} ${BPMP_UTILS_SRC})
+add_executable(bpmp_ros_type_converter exe/main_type_converter.cpp ${BPMP_ROSTYPE_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(bpmp_ros_type_converter ${catkin_LIBRARIES} -lstdc++fs)
 
 add_executable(bpmp_predictor ${BPMP_PREDICTOR_SRC} ${BPMP_UTILS_SRC})
@@ -54,10 +61,10 @@ target_link_libraries(bpmp_predictor ${catkin_LIBRARIES} -lstdc++fs)
 add_executable(bpmp_tracker exe/main_tracker.cpp ${BPMP_TRACKER_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(bpmp_tracker ${catkin_LIBRARIES} -lstdc++fs)
 
-install(TARGETS
-  bpmp_predictor
-  bpmp_simulator
-  bpmp_ros_type_converter
-  bpmp_tracker
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+#install(TARGETS
+#  bpmp_predictor
+#  bpmp_simulator
+#  bpmp_ros_type_converter
+#  bpmp_tracker
+#  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+#)

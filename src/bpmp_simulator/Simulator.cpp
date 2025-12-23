@@ -1,4 +1,6 @@
+#define CONVHULL_3D_ENABLE
 #include <bpmp_simulator/Simulator.h>
+
 void bpmp::Simulator::Run() {
     if (not analysis_mode_){
         double simulation_frequency = 1.0/simulation_dt_;
@@ -49,7 +51,7 @@ void bpmp::Simulator::Run() {
                     if(fail_flag_target)
                         ROS_WARN("ROBOT COLLLIDES OR IS TOO FAR WITH TARGET");
                     if(fail_flag_obstacle)
-                        ROS_WARN("ROBOT IS FAR FROM OBSTACLES");
+                        ROS_WARN("ROBOT COLLIDES WITH OBSTACLES");
                     if(fail_flag_fov)
                         ROS_WARN("ROBOT FAILS TO KEEP TARGET WITHIN FOV");
                 }
@@ -111,7 +113,7 @@ void bpmp::Simulator::Run() {
             if (sqrt(pow(current_target_state_.px - current_unicycle_state_.px, 2) +
                      pow(current_target_state_.py - current_unicycle_state_.py, 2)) > 5.0) {
                 fail_flag_target = true;
-            } // Target-Robot Too Far
+            } // Target-Robot Collision
             for (int idx = 0; idx < moving_obstacle_number_; idx++) {
                 if (sqrt(pow(current_obstacle_state_list_[idx].px - current_unicycle_state_.px, 2) +
                          pow(current_obstacle_state_list_[idx].py - current_unicycle_state_.py, 2)) < 2 * agent_size_) {
@@ -150,10 +152,10 @@ bpmp::Simulator::Simulator() : nh_("~") {
 
     // Obstacle Indices
     if (nh_.hasParam("obstacle_idx_list")) {
-        nh_.getParam("obstacle_idx_list", object_idx_list_);
+        nh_.getParam("obstacle_idx_list", obstacle_idx_list_);
     } else
         ROS_ERROR("Failed to find 'obstacle list'.");
-
+    object_idx_list_ = obstacle_idx_list_;
     // Target Index
     nh_.param<int>("target_idx", target_idx_, 0);
     object_idx_list_.push_back(target_idx_);
@@ -164,6 +166,7 @@ bpmp::Simulator::Simulator() : nh_("~") {
     nh_.param<string>("obstacle_configuration_file_name", obstacle_configuration_file_name_, "");
     nh_.param<int>("moving_obstacle_number", moving_obstacle_number_, 0);
     nh_.param<int>("total_test_number",total_test_number_,0);
+
 
     obstacle_vis_.header.frame_id = map_frame_id_;
     target_vis_.header.frame_id = map_frame_id_;
@@ -184,7 +187,7 @@ bpmp::Simulator::Simulator() : nh_("~") {
     obstacle_vis_.pose.orientation.y = 0.0;
     obstacle_vis_.pose.orientation.z = 0.0;
 
-    target_vis_.type = visualization_msgs::Marker::SPHERE;
+    target_vis_.type = visualization_msgs::Marker::CYLINDER;
     target_vis_.ns = "Target";
     target_vis_.id = 0;
     target_vis_.color.a = 1.0;
@@ -198,6 +201,42 @@ bpmp::Simulator::Simulator() : nh_("~") {
     target_vis_.pose.orientation.x = 0.0;
     target_vis_.pose.orientation.y = 0.0;
     target_vis_.pose.orientation.z = 0.0;
+
+    target_path_.header.frame_id =map_frame_id_;
+    robot_path_.header.frame_id = map_frame_id_;
+//    obstacle_path_.markers.resize(moving_obstacle_number_);
+
+    fov_vis_.header.frame_id = map_frame_id_;
+    fov_vis_.color.a = 0.7;
+    fov_vis_.color.r = 1.0;
+    fov_vis_.color.g = 1.0;
+    fov_vis_.color.b = 0.0;
+    fov_vis_.pose.position = GetDefaultPointMsg();
+    fov_vis_.pose.orientation = GetDefaultQuaternionMsg();
+    fov_vis_.scale = GetDefaultScaleMsg();
+    fov_vis_.type = visualization_msgs::Marker::TRIANGLE_LIST;
+
+    single_obstacle_path_.header.frame_id = map_frame_id_;
+    single_obstacle_path_.color.a = 1.0;
+    single_obstacle_path_.color.r = 0.18;
+    single_obstacle_path_.color.g = 0.44;
+    single_obstacle_path_.color.b = 0.25;
+    single_obstacle_path_.type=visualization_msgs::Marker::LINE_STRIP;
+    single_obstacle_path_.ns="OBSTACLE_PATH";
+    single_obstacle_path_.action = visualization_msgs::Marker::ADD;
+    single_obstacle_path_.scale.x = 0.1;
+    single_obstacle_path_.pose.position.x = 0.0;
+    single_obstacle_path_.pose.position.y = 0.0;
+    single_obstacle_path_.pose.position.z = 0.0;
+    single_obstacle_path_.pose.orientation.w = 1.0;
+    single_obstacle_path_.pose.orientation.x = 0.0;
+    single_obstacle_path_.pose.orientation.y = 0.0;
+    single_obstacle_path_.pose.orientation.z = 0.0;
+    for(int i=0;i<moving_obstacle_number_;i++){
+        single_obstacle_path_.id = i;
+        obstacle_path_.markers.push_back(single_obstacle_path_);
+    }
+
 
     point_cloud_.header.frame_id = map_frame_id_;
 
@@ -217,6 +256,11 @@ bpmp::Simulator::Simulator() : nh_("~") {
                                               &Simulator::control_input_callback, this);
     unicycle_control_input_subscriber_ = nh_.subscribe("/bpmp_tracker/unicycle_control_input", 1,
                                               &Simulator::unicycle_input_callback, this);
+    target_path_publisher_ = nh_.advertise<nav_msgs::Path>("target_path_vis",1);
+    robot_path_publisher_ = nh_.advertise<nav_msgs::Path>("robot_path_vis",1);
+    gar_robot_publisher_ = nh_.advertise<visualization_msgs::Marker>("robot_vis",1);
+    fov_publisher_ = nh_.advertise<visualization_msgs::Marker>("fov_vis",1);
+    obstacle_path_list_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("obstacle_path_vis",1);
     if(analysis_mode_){
         ReadObjectTrajectory();
         ShuffleScenario();
@@ -259,8 +303,16 @@ bpmp::Simulator::Simulator() : nh_("~") {
         }
     }
     else{
-        ReadInitialTrackerStateList();
+//        ReadInitialTrackerStateList();
         ReadObjectTrajectory();
+        unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
+        double theta = 3.0*3.141592/4.0;
+        current_unicycle_state_.px = object_history_list_[target_idx_].px.front() + 1.0 * cos(theta);
+        current_unicycle_state_.py = object_history_list_[target_idx_].py.front() + 1.0 * sin(theta);
+        current_unicycle_state_.pz = 0.5;
+        current_unicycle_state_.theta = atan2(object_history_list_[target_idx_].py.front()-current_unicycle_state_.py,
+                                              object_history_list_[target_idx_].px.front()-current_unicycle_state_.px);
+
         if (is_unstructured_)
             ReadObstacleConfiguration();
     }
@@ -298,6 +350,27 @@ void bpmp::Simulator::ReadObjectTrajectory() {
             object_history_list_[i].vz.push_back(stod(content[j][object_idx_list_[i] * num_read_unit + 7])*spatial_scale_*time_scale_);   // vz
         }
     }
+//    double min_distance_between_object = 999999.0;
+//    double temp_distance;
+//    for(int i=0;i<object_number_-1;i++){
+//        for(int j=i+1;j<object_number_;j++){
+//            for(int k=0;k<object_history_list_[i].t.size();k++){
+//                temp_distance = sqrt(pow(object_history_list_[i].px[k]-object_history_list_[j].px[k],2)+pow(object_history_list_[i].py[k]-object_history_list_[j].py[k],2));
+//                if(temp_distance<min_distance_between_object)
+//                    min_distance_between_object = temp_distance;
+//            }
+//        }
+//    }
+//    cout<<"[ATTENTION]: MIN DISTANCE BTW OBJECTS: "<<min_distance_between_object<<endl;
+//    double max_velocity_target=-1;
+//    for(int i=0;i<object_number_;i++){
+//        for(int j=0;j<object_history_list_[i].t.size();j++){
+//            if(max_velocity_target<sqrt(pow(object_history_list_[i].vx[j],2)+pow(object_history_list_[i].vy[j],2)))
+//                max_velocity_target = sqrt(pow(object_history_list_[i].vx[j],2)+pow(object_history_list_[i].vy[j],2));
+//        }
+//    }
+//    cout<<"[ATTENTION]: MAX VELOCITY OF TARGET: "<<max_velocity_target<<endl;
+
 }
 
 void bpmp::Simulator::UpdateDynamics(const double &t) {
@@ -396,6 +469,8 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
     // obstacle_state
     bpmp_tracker::ObjectState object_state_temp;
     obstacle_state_list_msg_.object_state_list.clear();
+    geometry_msgs::Point obstacle_pts;
+    /* OBSTACLE PATH VISUALIZATION
     for (int i = 0; i < current_obstacle_state_list_.size(); i++) {
         object_state_temp.px = current_obstacle_state_list_[i].px;
         object_state_temp.py = current_obstacle_state_list_[i].py;
@@ -404,11 +479,56 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
         object_state_temp.vy = current_obstacle_state_list_[i].vy;
         object_state_temp.vz = current_obstacle_state_list_[i].vz;
         obstacle_state_list_msg_.object_state_list.push_back(object_state_temp);
+        obstacle_pts.x = object_state_temp.px;
+        obstacle_pts.y = object_state_temp.py;
+        obstacle_pts.z = object_state_temp.pz;
+        obstacle_path_.markers[i].points.push_back(obstacle_pts);
     }
+    */
     tracker_state_msg_.px = current_unicycle_state_.px;
     tracker_state_msg_.py = current_unicycle_state_.py;
     tracker_state_msg_.pz = current_unicycle_state_.pz;
     tracker_state_msg_.theta = current_unicycle_state_.theta;
+    /* TARGET, ROBOT PATH VISUALIZATION
+    geometry_msgs::PoseStamped temp_target_pose;
+    temp_target_pose.header.frame_id = map_frame_id_;
+    temp_target_pose.pose.position.x = current_target_state_.px;
+    temp_target_pose.pose.position.y = current_target_state_.py;
+    temp_target_pose.pose.position.z = current_target_state_.pz;
+    temp_target_pose.pose.orientation.w = 1.0;
+    temp_target_pose.pose.orientation.x = 0.0;
+    temp_target_pose.pose.orientation.y = 0.0;
+    temp_target_pose.pose.orientation.z = 0.0;
+    target_path_.poses.push_back(temp_target_pose);
+
+    geometry_msgs::PoseStamped  temp_robot_pose;
+    temp_robot_pose.header.frame_id = map_frame_id_;
+    temp_robot_pose.pose.position.x = current_unicycle_state_.px;
+    temp_robot_pose.pose.position.y = current_unicycle_state_.py;
+    temp_robot_pose.pose.position.z = current_unicycle_state_.pz;
+    temp_robot_pose.pose.orientation.w = sin(current_unicycle_state_.theta);
+    temp_robot_pose.pose.orientation.x = cos(current_unicycle_state_.theta);
+    temp_robot_pose.pose.orientation.y = 0.0;
+    temp_robot_pose.pose.orientation.z = 0.0;
+    robot_path_.poses.push_back(temp_robot_pose);
+    */
+    gar_robot_.color.a = 1.0;
+    gar_robot_.color.r = 0.0;
+    gar_robot_.color.g = 0.0;
+    gar_robot_.color.b = 1.0;
+    gar_robot_.header.frame_id = map_frame_id_;
+    gar_robot_.type = visualization_msgs::Marker::CYLINDER;
+    gar_robot_.scale.x = 2.0*agent_size_;
+    gar_robot_.scale.y = 2.0*agent_size_;
+    gar_robot_.scale.z = 1.0;
+    gar_robot_.pose.position.x = current_unicycle_state_.px;
+    gar_robot_.pose.position.y = current_unicycle_state_.py;
+    gar_robot_.pose.position.z = 0.5;
+    gar_robot_.pose.orientation.w = 1.0;
+    gar_robot_.pose.orientation.x = 0.0;
+    gar_robot_.pose.orientation.y = 0.0;
+    gar_robot_.pose.orientation.z = 0.0;
+
 }
 
 void bpmp::Simulator::PublishRosMsgs() {
@@ -422,6 +542,16 @@ void bpmp::Simulator::PublishRosMsgs() {
     tracker_state_publisher_.publish(tracker_state_msg_);
     obstacle_state_list_publisher_.publish(obstacle_state_list_msg_);
     target_state_publisher_.publish(target_state_msg_);
+    target_path_publisher_.publish(target_path_);
+    robot_path_publisher_.publish(robot_path_);
+    gar_robot_publisher_.publish(gar_robot_);
+    obstacle_path_list_publisher_.publish(obstacle_path_);
+
+    std::vector<bpmp::AffineCoeff2D> fov_constraints = GetFOVConstraints();
+    Vec3List vertices = GetFeasibleVertices(fov_constraints);
+    fov_publisher_.publish(VisualizeConvexHull(vertices));
+
+
 }
 
 void bpmp::Simulator::control_input_callback(const bpmp_tracker::ControlInput &msg) {
@@ -570,4 +700,154 @@ std::vector<int> bpmp::Simulator::GenerateUniqueRandomArray(int size, int lower_
     // Take the first 'size' elements from the shuffled vector
     std::vector<int> randomArray(allNumbers.begin(), allNumbers.begin() + size);
     return randomArray;
+}
+
+Vec3List bpmp::Simulator::GetFeasibleVertices(const std::vector<bpmp::AffineCoeff2D> &constraint) {
+    Vec3List vertices;
+
+    if(constraint.empty())
+        return vertices;
+    bpmp::AffineCoeff3D single_constraint;
+    vector<bpmp::AffineCoeff3D> constraint_list;
+
+    for(int idx=0;idx<constraint.size();idx++){
+        single_constraint[0] = constraint[idx][0];
+        single_constraint[1] = constraint[idx][1];
+        single_constraint[2] = 0.0;
+        single_constraint[3] = constraint[idx][2];
+        constraint_list.push_back(single_constraint);
+    }
+    vector<bpmp::AffineCoeff3D> world_boundary_constraint = GetHalfSpaceFromBoundary();
+    for(int i =0;i<world_boundary_constraint.size();i++)
+        constraint_list.push_back(world_boundary_constraint[i]);
+
+    Eigen::Matrix3Xd vertices_mtx;
+    Eigen::MatrixX4d hs_mtx(constraint_list.size(), 4);
+    int row = 0;
+    for(const auto& h: constraint_list){
+        // h = {x | n \dot (x - p) - d >= 0}
+        // h1*x + h2*y +h3*z+ h4 <=0
+        hs_mtx(row, 0) = h[0];
+        hs_mtx(row, 1) = h[1];
+        hs_mtx(row, 2) = h[2];
+        hs_mtx(row, 3) = h[3];
+        row++;
+    }
+    if(not geo_utils::enumerateVs(hs_mtx,vertices_mtx)){
+        bool success = geo_utils::enumerateVs(hs_mtx,vertices_mtx);
+        if(not success){
+            std::cout<<"[Constraints]: Fail to find feasible vertices!"<<std::endl;
+            return vertices;
+        }
+    }
+    for(int i=0;i<vertices_mtx.cols();i++)
+        vertices.emplace_back(vertices_mtx.col(i)(0),vertices_mtx.col(i)(1),vertices_mtx.col(i)(2));
+
+    return vertices;
+}
+
+std::vector<bpmp::AffineCoeff3D> bpmp::Simulator::GetHalfSpaceFromBoundary() {
+    vector<bpmp::AffineCoeff3D> boundary_halfspaces;
+    bpmp::AffineCoeff3D half_space;
+    {   // x-limit
+        half_space[0] = -1.0;
+        half_space[1] = 0.0;
+        half_space[2] = 0.0;
+        half_space[3] = -20.0;
+        boundary_halfspaces.push_back(half_space);
+        half_space[0] = 1.0;
+        half_space[1] = 0.0;
+        half_space[2] = 0.0;
+        half_space[3] =-20.0;
+        boundary_halfspaces.push_back(half_space);
+    }
+    {   // y-limit
+        half_space[0] = 0.0;
+        half_space[1] = -1.0;
+        half_space[2] = 0.0;
+        half_space[3] = -20.0;
+        boundary_halfspaces.push_back(half_space);
+        half_space[0] = 0.0;
+        half_space[1] = 1.0;
+        half_space[2] = 0.0;
+        half_space[3] = -20.0;
+        boundary_halfspaces.push_back(half_space);
+    }
+    {   // z-limit
+        half_space[0] = 0.0;
+        half_space[1] = 0.0;
+        half_space[2] = -1.0;
+        half_space[3] = 0;
+        boundary_halfspaces.push_back(half_space);
+        half_space[0] = 0.0;
+        half_space[1] = 0.0;
+        half_space[2] = 1.0;
+        half_space[3] = -2.0;
+        boundary_halfspaces.push_back(half_space);
+    }
+    return boundary_halfspaces;
+}
+
+visualization_msgs::Marker bpmp::Simulator::VisualizeConvexHull(const Vec3List &convex_hull) {
+    if(convex_hull.empty())
+        return visualization_msgs::Marker{};
+
+    size_t num_vertices = convex_hull.size();
+    ch_vertex *vertices;
+    vertices = (ch_vertex *) malloc(num_vertices * sizeof(ch_vertex));
+    for (size_t i = 0; i < num_vertices; i++) {
+        vertices[i].x = convex_hull[i].x();
+        vertices[i].y = convex_hull[i].y();
+        vertices[i].z = convex_hull[i].z();
+    }
+    int *face_indices = nullptr;
+    int num_faces;
+    convhull_3d_build(vertices, num_vertices, &face_indices, &num_faces);
+
+    PointMsg vertex;
+    fov_vis_.colors.clear();
+    fov_vis_.points.clear();
+    fov_vis_.id =0;
+    fov_vis_.ns="FOV";
+
+    ColorMsg cell_color;
+    cell_color.a = 0.2;
+    cell_color.r = 1.0;
+    cell_color.g = 1.0;
+    cell_color.b = 0.0;
+    for (int i = 0; i < num_faces; i++) {
+        auto vertex1 = vertices[face_indices[i * 3]];
+        auto vertex2 = vertices[face_indices[i * 3 + 1]];
+        auto vertex3 = vertices[face_indices[i * 3 + 2]];
+        vertex.x = vertex1.x, vertex.y = vertex1.y, vertex.z = vertex1.z;
+        fov_vis_.points.emplace_back(vertex);
+        vertex.x = vertex2.x, vertex.y = vertex2.y, vertex.z = vertex2.z;
+        fov_vis_.points.emplace_back(vertex);
+        vertex.x = vertex3.x, vertex.y = vertex3.y, vertex.z = vertex3.z;
+        fov_vis_.points.emplace_back(vertex);
+        fov_vis_.colors.push_back(cell_color);
+    }
+
+    free(vertices);
+    free(face_indices);
+    return fov_vis_;
+}
+
+std::vector<bpmp::AffineCoeff2D> bpmp::Simulator::GetFOVConstraints() {
+    std::vector<bpmp::AffineCoeff2D> constraint;
+    double cos_plus, sin_plus;
+    double cos_minus, sin_minus;
+    cos_plus = cos(current_unicycle_state_.theta+M_PI*0.33333333);
+    cos_minus = cos(current_unicycle_state_.theta-M_PI*0.33333333);
+    sin_plus = sin(current_unicycle_state_.theta+M_PI*0.33333333);
+    sin_minus = sin(current_unicycle_state_.theta-M_PI*0.33333333);
+    // FIRST
+    AffineCoeff2D first;
+    first[0] = -sin_plus, first[1] = cos_plus, first[2] = current_unicycle_state_.px*sin_plus - current_unicycle_state_.py*cos_plus;
+    constraint.push_back(first);
+    // SECOND
+    AffineCoeff2D  second;
+    second[0] = sin_minus, second[1] = -cos_minus, second[2] = -current_unicycle_state_.px*sin_minus+current_unicycle_state_.py*cos_minus;
+    constraint.push_back(second);
+    return constraint;
 }
