@@ -48,6 +48,7 @@ file(GLOB BPMP_SIMULATOR_SRC src/bpmp_simulator/Simulator.cpp)
 file(GLOB BPMP_ROSTYPE_SRC src/bpmp_simulator/RosTypeConverter.cpp)
 file(GLOB BPMP_PREDICTOR_SRC src/bpmp_predictor/*.cpp exe/main_predictor.cpp)
 file(GLOB BPMP_TRACKER_SRC src/bpmp_tracker/Wrapper.cpp src/bpmp_tracker/PlannerBase.cpp src/bpmp_tracker/Tracker.cpp src/bpmp_tracker/PlanningVisualizer.cpp src/bpmp_tracker/RosWrapper.cpp )
+file(GLOB BPMP_COMPARISON_SRC src/comparison/*.cpp)
 
 add_executable(bpmp_simulator exe/main_simulator.cpp ${BPMP_SIMULATOR_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(bpmp_simulator ${catkin_LIBRARIES} -lstdc++fs)
@@ -60,6 +61,9 @@ target_link_libraries(bpmp_predictor ${catkin_LIBRARIES} -lstdc++fs)
 
 add_executable(bpmp_tracker exe/main_tracker.cpp ${BPMP_TRACKER_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(bpmp_tracker ${catkin_LIBRARIES} -lstdc++fs)
+
+add_executable(comparison_controller exe/main_tracking_controller.cpp ${BPMP_COMPARISON_SRC} ${BPMP_UTILS_SRC})
+target_link_libraries(comparison_controller ${catkin_LIBRARIES} -lstdc++fs)
 
 #install(TARGETS
 #  bpmp_predictor

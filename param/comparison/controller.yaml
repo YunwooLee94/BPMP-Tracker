@@ -1,0 +1,6 @@
+gain_k1: 1.0
+gain_k2: 1.0
+gain_o: 1.0
+tracking_radius: 1.0 # DO NOT MODIFY
+v_max: 3.0 # DO NOT MODIFY
+w_max: 3.141592 # DO NOT MODIFY
