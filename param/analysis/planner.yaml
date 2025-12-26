@@ -15,5 +15,5 @@ fov: 2.09 # 2.09: (120 degree), 2.618: (150 degree)
 object_radius: 0.25
 is_experiment: false
 is_unstructured: true
-sample_mode: 0 # 0: fov_considerd, 1 fov_not_considered
-check_mode: 0 # 0: proposed, 1: DMVC-Tracker, 2:BPMP-Tracker
+sample_mode: 1 # 0: fov_considerd, 1 fov_not_considered
+check_mode: 1 # 0: proposed, 1: DMVC-Tracker, 2:BPMP-Tracker

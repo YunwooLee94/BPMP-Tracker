@@ -18,12 +18,17 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
         return false;
     }
     GeneratePrimitive(t_trigger);
-    GetFOVIndex(); // Field-of-View Constraints
+    //GetFOVIndex(); // Field-of-View Constraints
     bool pass_test0 = true;
+    /*
     if(visible_index_.empty()){
         pass_test0 = false;
 //        cout<<"NO VISIBLE INDEX"<<endl;
     }
+    */
+    visible_index_.clear();
+    for(int i=0;i<param_.num_sample_planning;i++)
+	    visible_index_.push_back(i);
     if(pass_test0){
         switch (EnvironmentMode()){
             case 0:{
