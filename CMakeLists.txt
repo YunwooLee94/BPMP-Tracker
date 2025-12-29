@@ -10,6 +10,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE")
 set(CMAKE_BUILD_TYPE Release)
 
+find_package(Eigen3  REQUIRED NO_MODULE)
+include_directories(${EIGEN3_INCLUDE_DIRS})
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -24,6 +26,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${DECOMP_UTIL_INCLUDE_DIRS})
+include_directories(${EIGEN3_INCLUDE_DIRS})
 find_package(Boost REQUIRED COMPONENTS thread)
 include_directories(${Boost_INCLUD_DIRS})
 
@@ -50,6 +53,7 @@ file(GLOB BPMP_PREDICTOR_SRC src/bpmp_predictor/*.cpp exe/main_predictor.cpp)
 file(GLOB BPMP_TRACKER_SRC src/bpmp_tracker/Wrapper.cpp src/bpmp_tracker/PlannerBase.cpp src/bpmp_tracker/Tracker.cpp src/bpmp_tracker/PlanningVisualizer.cpp src/bpmp_tracker/RosWrapper.cpp )
 file(GLOB BPMP_COMPARISON_SRC src/comparison/*.cpp)
 
+
 add_executable(bpmp_simulator exe/main_simulator.cpp ${BPMP_SIMULATOR_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(bpmp_simulator ${catkin_LIBRARIES} -lstdc++fs)
 
@@ -64,6 +68,9 @@ target_link_libraries(bpmp_tracker ${catkin_LIBRARIES} -lstdc++fs)
 
 add_executable(comparison_controller exe/main_tracking_controller.cpp ${BPMP_COMPARISON_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(comparison_controller ${catkin_LIBRARIES} -lstdc++fs)
+
+add_executable(baseline exe/main_baseline.cpp ${BPMP_COMPARISON_SRC} ${BPMP_UTILS_SRC})
+target_link_libraries(baseline ${catkin_LIBRARIES} -lstdc++fs)
 
 #install(TARGETS
 #  bpmp_predictor
