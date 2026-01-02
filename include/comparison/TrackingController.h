@@ -59,10 +59,10 @@ namespace bpmp{
         ros::Publisher tracking_circle_publisher_;
         visualization_msgs::Marker tracking_circle_marker_;
 
-        // Debug visualization: obstacle that triggered P -> Pm augmentation
-        ros::Publisher avoidance_debug_marker_publisher_;
+        ros::Publisher active_obstacle_marker_publisher_;
+        visualization_msgs::Marker active_obstacle_marker_;
 
-        // Debug visualization: P -> Pm modification (points/line)
+        // Debug visualization: P0 -> P modification (points/line)
         ros::Publisher p_augment_debug_marker_publisher_;
 
 
