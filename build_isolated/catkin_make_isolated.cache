@@ -1,0 +1,2 @@
+
+-G Unix Makefiles -DCATKIN_DEVEL_PREFIX=/home/hsj/BPMP-Tracker/devel_isolated -DCMAKE_INSTALL_PREFIX=/home/hsj/BPMP-Tracker/install_isolated
