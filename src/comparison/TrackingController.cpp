@@ -138,9 +138,9 @@ void bpmp::TrackingController::MakeControl() {
             const double dp = std::hypot(px - P0x, py - P0y);
             if (dp > 1e-4) {
                 const double obs_speed = std::hypot(nearest_obs.vx, nearest_obs.vy);
-                ROS_INFO_THROTTLE(0.5,
-                    "[P-augment] P:(%.2f,%.2f)->(%.2f,%.2f) | idx=%d dO=%.2f infl=%.2f kj=%.2f p1=%.2f p2=%.2f vO=%.2f",
-                    P0x, P0y, px, py, nearest_obs_idx, d_obs_min, infl, kj, p1, p2, obs_speed);
+                //ROS_INFO_THROTTLE(0.5,
+                //    "[P-augment] P:(%.2f,%.2f)->(%.2f,%.2f) | idx=%d dO=%.2f infl=%.2f kj=%.2f p1=%.2f p2=%.2f vO=%.2f",
+                //    P0x, P0y, px, py, nearest_obs_idx, d_obs_min, infl, kj, p1, p2, obs_speed);
             }
         }
     }
@@ -283,16 +283,16 @@ void bpmp::TrackingController::MakeControl() {
                         -param_.gain_k2 * phi_T;
 
         const double dp = std::hypot(px - P0x, py - P0y);
-        ROS_INFO_THROTTLE(0.5,
-            "[CTRL] useP=(%.2f,%.2f) baseP0=(%.2f,%.2f) dp=%.3f | r=%.3f phi_P=%.1fdeg v=%.2f w=%.2f avoid=%d",
-            px, py, P0x, P0y, dp,
-            r, phi_P * 180.0 / M_PI, u.vel_linear, u.vel_angular, (int)avoid_active);
+        //ROS_INFO_THROTTLE(0.5,
+        //    "[CTRL] useP=(%.2f,%.2f) baseP0=(%.2f,%.2f) dp=%.3f | r=%.3f phi_P=%.1fdeg v=%.2f w=%.2f avoid=%d",
+        //    px, py, P0x, P0y, dp,
+        //    r, phi_P * 180.0 / M_PI, u.vel_linear, u.vel_angular, (int)avoid_active);
 
         // Force log when augmentation is active (no throttle)
         if (avoid_active) {
-            ROS_INFO("[CTRL-AUG] P0=(%.2f,%.2f) P=(%.2f,%.2f) dp=%.3f r=%.3f phi=%.1fdeg v=%.2f w=%.2f",
-                P0x, P0y, px, py, dp,
-                r, phi_P * 180.0 / M_PI, u.vel_linear, u.vel_angular);
+           // ROS_INFO("[CTRL-AUG] P0=(%.2f,%.2f) P=(%.2f,%.2f) dp=%.3f r=%.3f phi=%.1fdeg v=%.2f w=%.2f",
+            //    P0x, P0y, px, py, dp,
+             //   r, phi_P * 180.0 / M_PI, u.vel_linear, u.vel_angular);
         }
     }
 
@@ -308,9 +308,9 @@ void bpmp::TrackingController::MakeControl() {
     tracker_control_input_publisher_.publish(u);
 
     const double dPT = std::hypot(px - tx, py - ty);
-    ROS_INFO_THROTTLE(0.5,
-        "[A] dPT=%.3f (want %.3f) dObs=%.2f hasObs=%d hold=%d",
-        dPT, param_.tracking_radius, d_obs_min, (int)has_obstacle, (int)hold_near_goal_);
+//    ROS_INFO_THROTTLE(0.5,
+//       "[A] dPT=%.3f (want %.3f) dObs=%.2f hasObs=%d hold=%d",
+//        dPT, param_.tracking_radius, d_obs_min, (int)has_obstacle, (int)hold_near_goal_);
 }
 
 bool bpmp::TrackingController::is_info_received() {
