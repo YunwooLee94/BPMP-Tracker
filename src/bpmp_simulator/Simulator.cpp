@@ -470,7 +470,7 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
     bpmp_tracker::ObjectState object_state_temp;
     obstacle_state_list_msg_.object_state_list.clear();
     geometry_msgs::Point obstacle_pts;
-    /* OBSTACLE PATH VISUALIZATION
+    // Fill obstacle_state_list_msg_ (required for controller)
     for (int i = 0; i < current_obstacle_state_list_.size(); i++) {
         object_state_temp.px = current_obstacle_state_list_[i].px;
         object_state_temp.py = current_obstacle_state_list_[i].py;
@@ -479,12 +479,13 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
         object_state_temp.vy = current_obstacle_state_list_[i].vy;
         object_state_temp.vz = current_obstacle_state_list_[i].vz;
         obstacle_state_list_msg_.object_state_list.push_back(object_state_temp);
+        /* OBSTACLE PATH VISUALIZATION (optional)
         obstacle_pts.x = object_state_temp.px;
         obstacle_pts.y = object_state_temp.py;
         obstacle_pts.z = object_state_temp.pz;
         obstacle_path_.markers[i].points.push_back(obstacle_pts);
+        */
     }
-    */
     tracker_state_msg_.px = current_unicycle_state_.px;
     tracker_state_msg_.py = current_unicycle_state_.py;
     tracker_state_msg_.pz = current_unicycle_state_.pz;

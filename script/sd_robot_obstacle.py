@@ -1,100 +1,14 @@
 import numpy as np
 
 def sd_robot_obstacle(robot_point, obs_origin, obs_radius):
-    """Compute the signed distance from a robot at position robot_point to an obstacle.
-    The LOS is defined as the line segment between the robot and the target, with an obstacle defined by its origin and radius.
-    Args:
-        obs_origin (np.ndarray): Origin of the obstacle.
-        obs_radius (float): Radius of the obstacle.
-        robot_point (np.ndarray): Position of the robot. Shape (2,).
-    Returns:
-        np.ndarray: Signed distance(s) from the robot to the obstacle. Shape (...,).
-    """
     obs_origin = np.asarray(obs_origin, dtype=float)
-    p1 = np.asarray(robot_point, dtype=float)
-    # Vector from robot to obstacle
-    w = obs_origin - p1
-    sd = np.sqrt(np.sum(w ** 2, axis=-1)) - obs_radius
+    p = np.asarray(robot_point, dtype=float)
+    d = p - obs_origin
+    return np.linalg.norm(d, axis=-1) - obs_radius
 
-    return sd
-
-
-
-def sd_robot_obstacle_gradient(x_r, obs_origin, obs_radius, eps=1e-6):
-    sd_value = sd_robot_obstacle(x_r, obs_origin, obs_radius)
-    sd_value_dx_r = (sd_robot_obstacle(x_r + np.array([eps, 0.0]), obs_origin, obs_radius) - sd_value) / eps
-    sd_value_dy_r = (sd_robot_obstacle(x_r + np.array([0.0, eps]), obs_origin, obs_radius) - sd_value) / eps
-
-    return sd_value_dx_r, sd_value_dy_r
-
-
-
-if __name__ == "__main__":
-    # simple test
-    import matplotlib.pyplot as plt
-
-    xx, yy = np.meshgrid(np.linspace(-5, 5, 200), np.linspace(-5, 5, 200))
-    zz = np.stack([xx, yy], axis=-1)
-
-    # x_t = np.array([2.0, 1.0])
-    # x_r = np.array([0.0, -1.0])
-    # heading_r = np.pi / 4
-    # x_t = np.array([2.0, 2.0])
-    # x_r = np.array([0.0, 0.0])
-    # heading_r = np.pi / 4
-    # fov_angle = np.pi / 3
-    # r_min = 1.0
-    # r_max = 4.0
-    eps = 1e-6
-
-    obstacle_origin = np.array([1.0, 0.0])
-    obstacle_radius = 0.5
-
-    x_r_list=[]
-    sd_value_grad_list=[]
-
-    for i in np.arange(-1, 3, 0.1):
-        for j in np.arange(-1, 3, 0.1):
-            x_r_tmp = np.array([i, j])
-            x_r_list.append(x_r_tmp.copy())
-            sd_value_dx_r, sd_value_dy_r = sd_robot_obstacle_gradient(x_r_tmp, obstacle_origin, obstacle_radius, eps=eps)
-            sd_value_grad_list.append([sd_value_dx_r, sd_value_dy_r])
-            print("abs of grad w.r.t Target Pos:", np.sqrt(sd_value_dx_r**2 + sd_value_dy_r**2))
-
-    sd = sd_robot_obstacle(robot_point=zz, obs_origin=obstacle_origin, obs_radius=obstacle_radius)
-    plt.contourf(xx, yy, sd, levels=200, cmap="RdBu_r")
-    plt.colorbar(label="Signed Distance")
-    plt.contour(xx, yy, sd, levels=[0.0], colors="k", linewidths=2)
-
-    plt.plot(obstacle_origin[0], obstacle_origin[1], "ro", label="obstacle", markersize=8)
-    # plt.arrow(
-    #     x_r[0], x_r[1],
-    #     0.5 * np.cos(heading_r), 0.5 * np.sin(heading_r),
-    #     head_width=0.1, head_length=0.1, fc="r", ec="r", label="Heading"
-    # )
-    # plot gradient
-    # plt.quiver(
-    #     x_r[0], x_r[1],
-    #     sd_value_dx_r, sd_value_dy_r,
-    #     color="r", scale=10.0, width=0.005, label="Grad w.r.t Robot Pos"
-    # )
-    print("abs of grad w.r.t Robot Pos:", np.sqrt(sd_value_dx_r**2 + sd_value_dy_r**2))
-    # plt.quiver(
-    #     x_t[0], x_t[1],
-    #     sd_value_dx_t, sd_value_dy_t,
-    #     color="g", scale=10.0, width=0.005, label="Grad w.r.t Target Pos"
-    # )
-    for i in range(len(x_r_list)):
-        # plt.scatter(obstacle_origin_list[i][0], obstacle_origin_list[i][1], color="k", s=5)
-        plt.quiver(
-            x_r_list[i][0], x_r_list[i][1],
-            sd_value_grad_list[i][0], sd_value_grad_list[i][1],
-            color="r", scale=60.0, width=0.002
-        )
-
-    # plt.plot(x_r[0], x_r[1], "ro", label="Robot", markersize=8)
-    plt.legend()
-    plt.axis("equal")
-    plt.xlabel("X")
-    plt.ylabel("Y")
-    plt.show()
+def sd_robot_obstacle_gradient(robot_point, obs_origin, obs_radius, eps=1e-12):
+    p = np.asarray(robot_point, dtype=float).reshape(2,)
+    c = np.asarray(obs_origin, dtype=float).reshape(2,)
+    d = p - c
+    n = float(np.linalg.norm(d)) + eps
+    return d[0] / n, d[1] / n

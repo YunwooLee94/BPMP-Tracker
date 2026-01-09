@@ -68,14 +68,29 @@ target_link_libraries(bpmp_tracker ${catkin_LIBRARIES} -lstdc++fs)
 
 add_executable(comparison_controller exe/main_tracking_controller.cpp ${BPMP_COMPARISON_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(comparison_controller ${catkin_LIBRARIES} -lstdc++fs)
+add_dependencies(comparison_controller ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(bpmp_ros_type_converter ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(bpmp_tracker ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(bpmp_simulator ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(bpmp_predictor ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(baseline exe/main_baseline.cpp ${BPMP_COMPARISON_SRC} ${BPMP_UTILS_SRC})
-target_link_libraries(baseline ${catkin_LIBRARIES} -lstdc++fs)
+install(TARGETS
+ bpmp_predictor
+ bpmp_simulator
+ bpmp_ros_type_converter
+ bpmp_tracker
+ comparison_controller
+ DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
-#install(TARGETS
-#  bpmp_predictor
-#  bpmp_simulator
-#  bpmp_ros_type_converter
-#  bpmp_tracker
-#  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-#)
+install(DIRECTORY launch/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+)
+
+install(DIRECTORY param/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/param
+)
+
+install(DIRECTORY world/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/world
+)

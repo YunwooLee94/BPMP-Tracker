@@ -1,69 +1,60 @@
 import numpy as np
 
-def sd_LOS(los_point1, los_point2, obs_origin, obs_radius):
-    """Compute the signed distance from point z to the line-of-sight (LOS) defined by two points.
+def sd_LOS(los_point1, los_point2, obs_origin, obs_radius, eps=1e-12):
+    a = np.asarray(los_point1, dtype=float).reshape(2,)  # robot
+    b = np.asarray(los_point2, dtype=float).reshape(2,)  # target
+    c = np.asarray(obs_origin, dtype=float).reshape(2,)  # obstacle center
 
-    The LOS is defined by two points los_point1 and los_point2.
-    The signed distance is positive if the point is on the left side of the LOS (looking from point1 to point2),
-    negative if on the right side, and zero if on the LOS.
+    v = b - a
+    vv = float(np.dot(v, v))
+    if vv < eps:
+        d = c - a
+        return float(np.linalg.norm(d) - obs_radius)
 
-    Args:
-        obs_origin (np.ndarray): Point(s) from which to compute the signed distance. Shape (..., 2).
-        obs_radius (float): Radius of the obstacle(s).
-        los_point1 (np.ndarray): First point defining the LOS. Shape (2,).
-        los_point2 (np.ndarray): Second point defining the LOS. Shape (2,).
-    Returns:
-        np.ndarray: Signed distance(s) from point(s) z to the LOS. Shape (...,).
+    t = float(np.dot(c - a, v) / vv)
+    t = float(np.clip(t, 0.0, 1.0))
+    q = a + t * v
+    d = c - q
+    return float(np.linalg.norm(d) - obs_radius)
+
+def sd_LOS_gradient(x_t, x_r, obs_origin, obs_radius, eps=1e-12):
+    """Gradient of sd_LOS wrt target (x_t) and robot (x_r) positions.
+
+    Returns: dsd/dx_t, dsd/dy_t, dsd/dx_r, dsd/dy_r
     """
-    obs_origin = np.asarray(obs_origin, dtype=float)
-    p1 = np.asarray(los_point1, dtype=float)
-    p2 = np.asarray(los_point2, dtype=float)
+    a = np.asarray(x_r, dtype=float).reshape(2,)
+    b = np.asarray(x_t, dtype=float).reshape(2,)
+    c = np.asarray(obs_origin, dtype=float).reshape(2,)
 
-    # Vector from point1 to point2
-    v = p2 - p1
-    # Vector from point1 to point obs_origin
-    w = obs_origin - p1
+    v = b - a
+    vv = float(np.dot(v, v))
+    if vv < eps:
+        d = c - a
+        n = float(np.linalg.norm(d)) + eps
+        u = d / n
+        grad_a = -u
+        grad_b = np.zeros(2)
+        return float(grad_b[0]), float(grad_b[1]), float(grad_a[0]), float(grad_a[1])
 
-    # Compute the cross product (in 2D, this is a scalar)
-    cross = v[..., 0] * w[..., 1] - v[..., 1] * w[..., 0]
-    lambda_ = np.dot(w, v) / (np.dot(v, v) + 1e-12)
+    t_raw = float(np.dot(c - a, v) / vv)
+    t = float(np.clip(t_raw, 0.0, 1.0))
+    q = a + t * v
+    d = c - q
+    n = float(np.linalg.norm(d)) + eps
+    u = d / n
 
-    sd = np.zeros_like(cross)
-    # if obs_origin.ndim == 1:
-    #     obs_origin = obs_origin[np.newaxis, :]
-    #     obs_radius = obs_radius[np.newaxis]
-    # If the projection falls before point1
-    mask1 = lambda_ < 0.0
-    sd[mask1] = np.sqrt(np.sum((obs_origin[mask1] - p1) ** 2, axis=-1)) - obs_radius
-    # If the projection falls after point2
-    mask2 = lambda_ > 1.0
-    sd[mask2] = np.sqrt(np.sum((obs_origin[mask2] - p2) ** 2, axis=-1)) - obs_radius
-    # If the projection falls between point1 and point2
-    mask3 = ~(mask1 | mask2)
-    sd[mask3] = (abs(cross[mask3]) / (np.sqrt(np.dot(v, v)) + 1e-12)) - obs_radius
+    if t_raw <= 0.0:
+        grad_a = -u
+        grad_b = np.zeros(2)
+    elif t_raw >= 1.0:
+        grad_a = np.zeros(2)
+        grad_b = -u
+    else:
+        grad_a = -(1.0 - t) * u
+        grad_b = -t * u
 
-    return sd
+    return float(grad_b[0]), float(grad_b[1]), float(grad_a[0]), float(grad_a[1])
 
-
-
-def sd_LOS_gradient(x_t, x_r, obs_origin, obs_radius, eps=1e-6):
-    sd_value = sd_LOS(x_t, x_r, obs_origin, obs_radius)
-
-    sd_value_dx_t = (sd_LOS(x_t + np.array([eps, 0.0]), x_r, obs_origin, obs_radius) - sd_value) / eps
-    sd_value_dy_t = (sd_LOS(x_t + np.array([0.0, eps]), x_r, obs_origin, obs_radius) - sd_value) / eps
-    sd_value_dx_r = (sd_LOS(x_t, x_r + np.array([eps, 0.0]), obs_origin, obs_radius) - sd_value) / eps
-    sd_value_dy_r = (sd_LOS(x_t, x_r + np.array([0.0, eps]), obs_origin, obs_radius) - sd_value) / eps
-
-    # normalize gradient w.r.t x y of robot position, target position to unit norm
-    # since the gradient should be 1.0 in magnitude 
-    # norm_t = np.sqrt(sd_value_dx_t**2 + sd_value_dy_t**2) + 1e-12
-    # sd_value_dx_t /= norm_t
-    # sd_value_dy_t /= norm_t
-    # norm_r = np.sqrt(sd_value_dx_r**2 + sd_value_dy_r**2) + 1e-12
-    # sd_value_dx_r /= norm_r
-    # sd_value_dy_r /= norm_r
-
-    return sd_value_dx_t, sd_value_dy_t, sd_value_dx_r, sd_value_dy_r
 
 
 
@@ -100,7 +91,11 @@ if __name__ == "__main__":
             print("abs of grad w.r.t Target Pos:", np.sqrt(sd_value_dx_t**2 + sd_value_dy_t**2))
 
 
-    sd = sd_LOS(los_point1=x_t, los_point2=x_r, obs_origin=zz, obs_radius=obstacle_radius)
+    sd = np.zeros(zz.shape[0:2], dtype=float)
+    for i in range(zz.shape[0]):
+        for j in range(zz.shape[1]):
+            sd[i, j] = sd_LOS(los_point1=x_t, los_point2=x_r, obs_origin=zz[i, j], obs_radius=obstacle_radius)
+
 
     plt.contourf(xx, yy, sd, levels=200, cmap="RdBu_r")
     plt.colorbar(label="Signed Distance")
