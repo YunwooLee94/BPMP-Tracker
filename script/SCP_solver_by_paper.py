@@ -482,7 +482,7 @@ if __name__ == "__main__":
 
     test_fov_params = FOVParams(fov=np.deg2rad(60), r_min=0.5, r_max=5.0)
     b_r0 = BeliefState(mean=np.array([0.0, 0.0, np.deg2rad(30), 1.0]), covariance=np.eye(4)*0.001, dim=4)
-    b_t0 = BeliefState(mean=np.array([2.0, 0.0]), covariance=np.eye(2)*0.005, dim=2)
+    b_t0 = BeliefState(mean=np.array([0.5, 0.0]), covariance=np.eye(2)*0.005, dim=2)
 
     u_init = np.zeros((4, 2))  # 20 time steps, control dim 2
     w_max = np.deg2rad(60)  # max angular velocity

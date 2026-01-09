@@ -1,9 +1,9 @@
 # robot kinematic limits
 v0    : 0.0   # 초기 v (ROS에서 안 주면 param으로 둠)
-v_max : 2.0
+v_max : 3.0
 w_max : 1.0   # |omega| <= w_max
-a_min : -1.0
-a_max :  1.0
+a_min : -2.0
+a_max :  2.0
 
 # FOV params (annular sector)
 fov_angle : 2.0943951023931953  # 120 degrees in radians

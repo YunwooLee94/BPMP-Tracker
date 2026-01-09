@@ -21,13 +21,13 @@ struct OptimizationParam
     double time_step = 0.5;
 
     // robot/target noise (python과 동일한 형태)
-    Eigen::Matrix<double, Nx_r, Nx_r> robot_process_noise = Eigen::Matrix<double, Nx_r, Nx_r>::Identity() * 0.01;
-    Eigen::Matrix<double, Nx_t, Nx_t> target_process_noise = Eigen::Matrix<double, Nx_t, Nx_t>::Identity() * 0.01;
-    Eigen::Matrix<double, 2, 2>       target_sensor_noise  = Eigen::Matrix<double, 2, 2>::Identity() * 0.01;
+    Eigen::Matrix<double, Nx_r, Nx_r> robot_process_noise = Eigen::Matrix<double, Nx_r, Nx_r>::Identity() * 0.001;
+    Eigen::Matrix<double, Nx_t, Nx_t> target_process_noise = Eigen::Matrix<double, Nx_t, Nx_t>::Identity() * 0.001;
+    Eigen::Matrix<double, 2, 2>       target_sensor_noise  = Eigen::Matrix<double, 2, 2>::Identity() * 0.001;
 
     // initial covariances (실제로는 EKF/필터에서 받아오는 게 더 맞지만, 최소 구현은 param으로 둠)
-    Eigen::Matrix<double, Nx_r, Nx_r> robot_cov0 = Eigen::Matrix<double, Nx_r, Nx_r>::Identity() * 0.05;
-    Eigen::Matrix<double, Nx_t, Nx_t> target_cov0 = Eigen::Matrix<double, Nx_t, Nx_t>::Identity() * 0.05;
+    Eigen::Matrix<double, Nx_r, Nx_r> robot_cov0 = Eigen::Matrix<double, Nx_r, Nx_r>::Identity() * 0.001;
+    Eigen::Matrix<double, Nx_t, Nx_t> target_cov0 = Eigen::Matrix<double, Nx_t, Nx_t>::Identity() * 0.001;
 
     // robot kinematic limits
     double v0    = 0.0;   // 초기 v (ROS에서 안 주면 param으로 둠)
@@ -481,7 +481,8 @@ inline void get_J_m_and_constraints(const BeliefR& b_r0,
                                     double eta,
                                     double& J_m,
                                     double& constraint_sum,
-                                    const OptimizationParam& p)
+                                    const OptimizationParam& p,
+                                    const Eigen::Vector2d& u_t)
 {
     // rollout robot
     std::array<BeliefR, N+1> br;
@@ -499,7 +500,7 @@ inline void get_J_m_and_constraints(const BeliefR& b_r0,
 
     for(int k=0;k<N;k++){
         // 최소 구현: target control prediction을 0으로 둠
-        Eigen::Vector2d u_t(0.0, 0.0);
+        // Eigen::Vector2d u_t = u_t[k];
 
         double gamma_k = 1.0;
         bt[k+1] = target_step(bt[k], u_t, br[k+1], obs_centers, gamma_k, p);
@@ -541,9 +542,10 @@ inline void get_J_m_grad_FD(const BeliefR& b_r0,
                             Eigen::Matrix<double, N, Nu>& grad,
                             double& J_m_base,
                             double& constraint_base,
-                            const OptimizationParam& p)
+                            const OptimizationParam& p,
+                            const Eigen::Vector2d& u_t)
 {
-    get_J_m_and_constraints(b_r0, b_t0, u_bar, obs_centers, eta, J_m_base, constraint_base, p);
+    get_J_m_and_constraints(b_r0, b_t0, u_bar, obs_centers, eta, J_m_base, constraint_base, p, u_t);
 
     grad.setZero();
     for(int i=0;i<N;i++){
@@ -552,7 +554,7 @@ inline void get_J_m_grad_FD(const BeliefR& b_r0,
             u_pert(i,j) += p.grad_delta;
 
             double Jm_pert, c_pert;
-            get_J_m_and_constraints(b_r0, b_t0, u_pert, obs_centers, eta, Jm_pert, c_pert, p);
+            get_J_m_and_constraints(b_r0, b_t0, u_pert, obs_centers, eta, Jm_pert, c_pert, p, u_t);
             grad(i,j) = (Jm_pert - J_m_base) / p.grad_delta;
         }
     }
@@ -671,6 +673,11 @@ public:
         b_t0.mean = Eigen::Vector2d(problem_->target_state().px, problem_->target_state().py);
         b_t0.cov  = param_.target_cov0;
 
+        Eigen::Vector2d u_t;
+        u_t(0) = problem_->target_state().vx;
+        u_t(1) = problem_->target_state().vy;
+
+
         // ---- convert u_init_ to matrix ----
         Eigen::Matrix<double, N_, Nu_> u_bar;
         for(int k=0;k<N_;k++){
@@ -694,7 +701,7 @@ public:
                 // Jm + grad
                 Eigen::Matrix<double, N_, Nu_> J_grad;
                 double Jm_base = 0.0, c_base = 0.0;
-                get_J_m_grad_FD(b_r0, b_t0, u_bar, obs_centers, eta, J_grad, Jm_base, c_base, param_);
+                get_J_m_grad_FD(b_r0, b_t0, u_bar, obs_centers, eta, J_grad, Jm_base, c_base, param_, u_t);
 
                 // solve convex subproblem
                 Eigen::Matrix<double, N_, Nu_> u_star;
@@ -703,7 +710,7 @@ public:
 
                 // evaluate true merit at u_star
                 double Jm_star=0.0, c_star=0.0;
-                get_J_m_and_constraints(b_r0, b_t0, u_star, obs_centers, eta, Jm_star, c_star, param_);
+                get_J_m_and_constraints(b_r0, b_t0, u_star, obs_centers, eta, Jm_star, c_star, param_, u_t);
 
                 // improvement ratio
                 double predicted_dec = Jm_base - J_tilt_star;
@@ -760,7 +767,7 @@ public:
 
             // check constraints at final u_bar
             double Jm_final=0.0, c_final=0.0;
-            get_J_m_and_constraints(b_r0, b_t0, u_bar, obs_centers, eta, Jm_final, c_final, param_);
+            get_J_m_and_constraints(b_r0, b_t0, u_bar, obs_centers, eta, Jm_final, c_final, param_, u_t);
 
             if (c_final <= param_.tau_p) {
                 break;
@@ -775,7 +782,7 @@ public:
         }
         float toc = static_cast<float>(std::clock());
         float elapsed = (toc - tic) / CLOCKS_PER_SEC;
-        // std::cout << "[bpmp::Optimizer] Iterations: outer = " << iter_outer << ", inner = " << iter_inner << "Solve() time: " << elapsed << " sec" << std::endl;;
+        std::cout << "[bpmp::Optimizer] Iterations: outer = " << iter_outer << ", inner = " << iter_inner << "Solve() time: " << elapsed << " sec" << std::endl;;
     }
 
     const Collection<VectorU, N_>& solution() const { return u_sol_; }

@@ -8,6 +8,10 @@ Panels:
         - /GAR1/FeasiblePrimitives1
         - /ActiveObstacle1
         - /MarkerArray3
+        - /Marker3
+        - /Marker3/Status1
+        - /Marker4
+        - /Marker4/Status1
       Splitter Ratio: 0.3984000086784363
     Tree Height: 616
   - Class: rviz/Selection
@@ -419,6 +423,22 @@ Visualization Manager:
         fov_sector: true
       Queue Size: 100
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /robot_planning_path
+      Name: Marker
+      Namespaces:
+        robot_planning_path: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /target_predicted_path
+      Name: Marker
+      Namespaces:
+        target_predicted_path: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -456,10 +476,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 27.5264835357666
+      Scale: 43.313453674316406
       Target Frame: <Fixed Frame>
-      X: 4.145774841308594
-      Y: 4.448052883148193
+      X: 0.15163542330265045
+      Y: 4.217177867889404
     Saved: ~
 Window Geometry:
   Displays:
