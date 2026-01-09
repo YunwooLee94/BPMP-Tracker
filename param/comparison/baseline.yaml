@@ -1,5 +1,42 @@
-time_step: 0.1
-param_1: 1.0
-param_2: 2.0
-param_3: 3.0
-param_4: 4.0
+# robot kinematic limits
+v0    : 0.0   # 초기 v (ROS에서 안 주면 param으로 둠)
+v_max : 2.0
+w_max : 1.0   # |omega| <= w_max
+a_min : -1.0
+a_max :  1.0
+
+# FOV params (annular sector)
+fov_angle : 2.0943951023931953  # 120 degrees in radians
+r_min: 0.8
+r_max: 1.2
+
+# obstacle
+obs_radius : 0.25
+
+# merit parameters
+function_J : "2"          # "1": entropy sum, "2": -sum(gamma_k)
+gamma_collision_threshold : 0.1
+
+# SCP outer loop (eta)
+eta0 : 1.0
+eta_max : 1e3
+beta : 10.0
+tau_p : 1e-2
+
+# trust region
+d0 : 0.25
+d_min : 1e-3
+d_max : 2.0
+shrink : 0.5     # <1
+expand : 1.5     # >1
+rho_reject : 0.25
+rho_expand : 0.75
+
+# termination
+max_inner : 40
+max_outer : 5
+tau_conv : 1e-3
+tau_f    : 1e-4
+
+# gradient FD
+grad_delta : 1e-6

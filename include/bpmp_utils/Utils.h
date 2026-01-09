@@ -72,6 +72,12 @@ namespace bpmp{
         double vy;
         double vz;
     };
+    struct TargetStateBaseline{
+        double px;
+        double py;
+        double vx;
+        double vy;
+    };
     struct UnicycleState{
         double px;
         double py;
@@ -80,6 +86,16 @@ namespace bpmp{
     };
     struct UnicycleControlInput{
         double linear_speed;
+        double angular_speed;
+    };
+    struct UnicycleStateBaseline{
+        double px;
+        double py;
+        double theta;
+        double velocity;
+    };
+    struct UnicycleControlInputBaseline{
+        double acceleration;
         double angular_speed;
     };
     struct StateHistory{

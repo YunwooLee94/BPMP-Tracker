@@ -1,36 +1,17 @@
-//
-// Created by larr-laptop on 12/28/25.
-//
+// Description.h
+#ifndef BPMP_TRACKER_DESCRIPTION_HPP
+#define BPMP_TRACKER_DESCRIPTION_HPP
 
-#ifndef BPMP_TRACKER_DESCRIPTION_H
-#define BPMP_TRACKER_DESCRIPTION_H
+#include <Eigen/Geometry>
+#include <comparison/Dimension.h>
 
-#include <Eigen/Dense>
-
-using namespace Eigen;
-using namespace std;
-
-// base class for type definition
-template<const int Nx, const int Nu>
-class DescriptionBase
-{
-protected:
-    typedef Matrix<double,Nx,1> VectorX;
-    typedef Matrix<double,Nu,1> VectorU;
-};
-
-template<const int Nx, const int Nu>
-class ProblemDescription : public DescriptionBase<Nx,Nu>
-{
+template<const int N, const int Nu>
+class ProblemDescription{
 public:
-    using typename DescriptionBase<Nx,Nu>::VectorX;
-    using typename DescriptionBase<Nx,Nu>::VectorU;
-    explicit ProblemDescription(){};
-    ~ProblemDescription(){};
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    virtual ~ProblemDescription() = default;  // ★ 이 줄이 핵심 (polymorphic)
+
+    ProblemDescription() = default;
 };
 
-
-
-
-
-#endif //BPMP_TRACKER_DESCRIPTION_H
+#endif //BPMP_TRACKER_DESCRIPTION_HPP

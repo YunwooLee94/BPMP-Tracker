@@ -52,6 +52,7 @@ file(GLOB BPMP_ROSTYPE_SRC src/bpmp_simulator/RosTypeConverter.cpp)
 file(GLOB BPMP_PREDICTOR_SRC src/bpmp_predictor/*.cpp exe/main_predictor.cpp)
 file(GLOB BPMP_TRACKER_SRC src/bpmp_tracker/Wrapper.cpp src/bpmp_tracker/PlannerBase.cpp src/bpmp_tracker/Tracker.cpp src/bpmp_tracker/PlanningVisualizer.cpp src/bpmp_tracker/RosWrapper.cpp )
 file(GLOB BPMP_COMPARISON_SRC src/comparison/*.cpp)
+file(GLOB BPMP_BASELINE_SRC src/comparison/Baseline.cpp)
 
 
 add_executable(bpmp_simulator exe/main_simulator.cpp ${BPMP_SIMULATOR_SRC} ${BPMP_UTILS_SRC})
@@ -68,6 +69,10 @@ target_link_libraries(bpmp_tracker ${catkin_LIBRARIES} -lstdc++fs)
 
 add_executable(comparison_controller exe/main_tracking_controller.cpp ${BPMP_COMPARISON_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(comparison_controller ${catkin_LIBRARIES} -lstdc++fs)
+
+add_executable(baseline exe/main_baseline.cpp ${BPMP_COMPARISON_SRC} ${BPMP_UTILS_SRC})
+target_link_libraries(baseline ${catkin_LIBRARIES} -lstdc++fs)
+
 add_dependencies(comparison_controller ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(bpmp_ros_type_converter ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(bpmp_tracker ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

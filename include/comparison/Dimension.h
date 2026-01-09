@@ -1,11 +1,22 @@
-//
-// Created by larr-laptop on 12/28/25.
-//
-
+// Dimension.h
 #ifndef BPMP_TRACKER_DIMENSION_H
 #define BPMP_TRACKER_DIMENSION_H
-const int N = 10; // # time step
-const int Nx = 3; // # state variables
-const int Nu = 2; // # control input
-const int Nc = 10;// number of constraints
-#endif //BPMP_TRACKER_DIMENSION_H
+
+// Horizon length
+const int N  = 4;
+
+// Baseline에서 쓰는 “결정론적” tracker state dimension (x,y,theta)
+// const int Nx = 3;
+
+// control dimension (python: u=[omega, acc])
+const int Nu = 2;
+
+// legacy / placeholder
+// const int Nc = 10;
+
+// Belief dimensions used inside SCP cost evaluation
+// robot belief: [x,y,theta,v], target belief: [x,y]
+const int Nx_r = 4;
+const int Nx_t = 2;
+
+#endif
