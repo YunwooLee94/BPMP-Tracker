@@ -71,6 +71,9 @@ def sd_annular_sector(
     y = -s * p[..., 0] + c * p[..., 1]
 
     r = np.sqrt(x * x + y * y)
+    if r < 1e-12:
+        # at origin, return distance to inner arc
+        return r_min
     phi = np.arctan2(y, x)
 
     # ---- helper: point to segment distance (vectorized) ----
@@ -153,6 +156,13 @@ def sd_annular_sector_fov_gradient(x_t, x_r, heading_r, fov_angle, eps=1e-12, r_
 
     # polar
     r = np.sqrt(x * x + y * y)
+    if r < eps:
+        # - heading 방향으로 벗어나는 방향으로 그라디언트 설정
+        dsd_dx_t = -c
+        dsd_dy_t = -s
+        dsd_dx_r = -dsd_dx_t
+        dsd_dy_r = -dsd_dy_t
+        return dsd_dx_t, dsd_dy_t, dsd_dx_r, dsd_dy_r, 0.0
     phi = np.arctan2(y, x)
 
     # inside test (same as sd_annular_sector)
@@ -382,10 +392,180 @@ def gamma_k_bpod(mu_t, Sigma_t, mu_r, Sigma_r, r_min, r_max, fov_angle, obs_orig
         gamma_tf: scalar
         gamma_lo: (No,) vector
     """
+    gamma_value = 1.0
     gamma_tf = gamma_tf_FOV(mu_t, Sigma_t, mu_r, Sigma_r, r_min, r_max, fov_angle)
+    gamma_value *= gamma_tf
     gamma_lo, _, _ = gamma_lo_LOS(mu_t, Sigma_t, mu_r, Sigma_r, obs_origins, obs_radii)
-
-    # product can underflow if many obstacles; guard with log if needed
-    # Here keep simple product (usually No is small).
-    gamma_k = float(gamma_tf * np.prod(gamma_lo))
+    gamma_k = gamma_tf * np.exp(np.sum(np.log(np.clip(gamma_lo, 1e-12, 1.0))))
     return gamma_k, gamma_tf, gamma_lo
+
+
+if __name__ == "__main__":
+    # Example usage
+    mu_t_ = np.array([0.0, 0.0])
+    Sigma_t = np.array([[1.0, 0.0], 
+                        [0.0, 1.0]])
+    mu_r = np.array([0.0, 0.0, 0, 0.0])  # x, y, theta, v
+    Sigma_r = np.array([[0.001, 0.0, 0.0, 0.0],
+                        [0.0, 0.001, 0.0, 0.0],
+                        [0.0, 0.0, 0.001, 0.0],
+                        [0.0, 0.0, 0.0, 0.001]])
+    heading_r = np.pi / 4  # 45 degrees
+    r_min = 0.8
+    r_max = 2.0
+    fov_angle = np.pi / 3  # 60 degrees
+
+    eps = 1e-6
+    mu_t_ = mu_t_ + np.array([eps, 0])
+    obs_temp = np.zeros((0, 2))
+    obs_radius_temp = 0
+    gamma_forward = gamma_k_bpod(mu_t_, Sigma_t, mu_r, Sigma_r, r_min, r_max, fov_angle, obs_temp, obs_radius_temp)[0]
+    mu_t_ = mu_t_ - np.array([2*eps, 0])
+    gamma_back = gamma_k_bpod(mu_t_, Sigma_t, mu_r, Sigma_r, r_min, r_max, fov_angle, obs_temp, obs_radius_temp)[0]
+    
+    
+    grad_gamma = (gamma_forward - gamma_back) / (2*eps)
+    print("FOV SDF Gradient:", grad_gamma)
+
+
+
+    # import matplotlib.pyplot as plt
+
+    # xx, yy = np.meshgrid(np.linspace(-5, 10, 151), np.linspace(-5, 10, 151))
+    # zz = np.stack([xx, yy], axis=-1)
+
+    # prob_map = np.zeros(xx.shape)
+    # sd_value_map = np.zeros(xx.shape)
+    # for i in range(xx.shape[0]):
+    #     for j in range(xx.shape[1]):
+    #         mu_t = np.array([xx[i, j], yy[i, j]])
+    #         prob_map[i, j] = gamma_tf_FOV(
+    #             mu_t,
+    #             Sigma_t,
+    #             mu_r,
+    #             Sigma_r,
+    #             r_min,
+    #             r_max,
+    #             fov_angle,
+    #         )
+    #         sd_value_map[i, j] = sd_annular_sector_fov(
+    #             mu_t,
+    #             sector_origin=mu_r[0:2],
+    #             sector_dir=mu_r[2],
+    #             r_min=r_min,
+    #             r_max=r_max,
+    #             fov_angle=fov_angle,
+    #         )
+    # plt.figure()
+
+    # # plt.contourf(xx, yy, sd_value_map, levels=200, cmap="RdBu_r")
+    # # plt.colorbar(label="Signed Distance")
+    # # plt.contour(xx, yy, sd_value_map, levels=[0.0], colors="k", linewidths=2)
+    # plt.contour(xx, yy, prob_map, levels=[0.5], colors="g", linewidths=2)
+    # plt.contour(xx, yy, prob_map, levels=[0.8], colors="r", linewidths=2)
+    # plt.contour(xx, yy, prob_map, levels=[0.9], colors="r", linewidths=2)
+    # plt.contour(xx, yy, prob_map, levels=[0.7], colors="r", linewidths=2)
+    # plt.contourf(xx, yy, prob_map, levels=50, cmap='viridis')
+    # plt.plot(mu_r[0], mu_r[1], "ro", label="Robot", markersize=8)
+    # plt.plot(mu_t_[0], mu_t_[1], "bx", label="Target Mean", markersize=8)
+    # plt.colorbar(label='Probability of being in FOV')
+    # plt.xlabel('X position')
+    # plt.ylabel('Y position')
+    # plt.title('Probability Map of Target in Robot FOV')
+    # plt.show()
+
+    # #################################################################################
+
+    # xx, yy = np.meshgrid(np.linspace(-5, 10, 151), np.linspace(-5, 10, 151))
+    # zz = np.stack([xx, yy], axis=-1)
+    # # prob_map = np.zeros(xx.shape)
+    # sd_value_map = np.zeros(xx.shape)
+    # mu_t = np.array([5.0, 0.0])
+
+    # for i in range(xx.shape[0]):
+    #     for j in range(xx.shape[1]):
+    #         obs_origin = np.array([xx[i, j], yy[i, j]])
+    #         # prob_map[i, j] = gamma_lo_LOS(
+    #         #     mu_t,
+    #         #     Sigma_t,
+    #         #     mu_r,
+    #         #     Sigma_r,
+    #         #     obs_origin=obs_origin,
+    #         #     obs_radius=1.0,
+    #         # )
+    #         sd_value_map[i, j] = sd_LOS(
+    #             obs_origin=obs_origin,
+    #             obs_radius=1.0,
+    #             los_point1=mu_r[0:2],
+    #             los_point2=mu_t,
+    #         )
+
+    # prob_map = gamma_lo_LOS(
+    #     mu_t,
+    #     Sigma_t,
+    #     mu_r,
+    #     Sigma_r,
+    #     obs_origins=zz.reshape(-1,2),
+    #     obs_radii=1.0,
+    # )[0].reshape(xx.shape)
+    # # sd_value_map = sd_LOS(
+    # #     obs_origin=zz.reshape(-1,2),
+    # #     obs_radius=1.0,
+    # #     los_point1=mu_r[0:2],
+    # #     los_point2=mu_t,
+    # # ).reshape(xx.shape)
+    
+
+    # plt.figure()
+    # # plt.contourf(xx, yy, sd_value_map, levels=200, cmap="RdBu_r")
+    # # plt.colorbar(label="Signed Distance")
+    # plt.contour(xx, yy, sd_value_map, levels=[0.0], colors="k", linewidths=2)
+    # plt.contourf(xx, yy, prob_map, levels=50, cmap='viridis')
+    # plt.colorbar(label='Probability of being in LOS')
+    # plt.xlabel('X position')
+    # plt.ylabel('Y position')
+    # plt.title('Probability Map of Target in Robot LOS')
+    # plt.show()
+
+    # # #################################################################################
+
+    # xx, yy = np.meshgrid(np.linspace(-5, 10, 200), np.linspace(-5, 10, 200))
+    # zz = np.stack([xx, yy], axis=-1)
+    # prob_map = np.zeros(xx.shape)
+    # sd_value_map = np.zeros(xx.shape)
+    # # for i in range(xx.shape[0]):
+    # #     for j in range(xx.shape[1]):
+    # #         obs_origin = np.array([xx[i, j], yy[i, j]])
+    # #         prob_map[i, j] = gamma_ro_collision(
+    # #             mu_r,
+    # #             Sigma_r,
+    # #             obs_origin=obs_origin,
+    # #             obs_radius=1.0,
+    # #         )
+    # #         sd_value_map[i, j] = sd_robot_obstacle(
+    # #             robot_point=mu_r[0:2],
+    # #             obs_origin=obs_origin,
+    # #             obs_radius=1.0,
+    # #         )
+    # # sd_value_map = sd_robot_obstacle(
+    # #     robot_point=mu_r[0:2],
+    # #     obs_origin=zz.reshape(-1,2),
+    # #     obs_radius=1.0,
+    # # ).reshape(xx.shape)
+    # prob_map = gamma_ro_collision(
+    #     mu_r,
+    #     Sigma_r,
+    #     obs_origins=zz.reshape(-1,2),
+    #     obs_radii=1.0,
+    # )[0].reshape(xx.shape)
+
+    # plt.figure()
+    # # plt.contourf(xx, yy, sd_value_map, levels=200, cmap="RdBu_r")
+    # # plt.colorbar(label="Signed Distance")
+    # # plt.contour(xx, yy, sd_value_map, levels=[0.0], colors="k", linewidths=2)
+    # plt.contourf(xx, yy, prob_map, levels=50, cmap='viridis')
+    # plt.colorbar(label='Probability of Robot-Obstacle Collision')
+    # plt.xlabel('X position')
+    # plt.ylabel('Y position')
+    # plt.title('Probability Map of Robot-Obstacle Collision')
+    # plt.show()

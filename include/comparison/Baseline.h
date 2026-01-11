@@ -46,6 +46,7 @@ namespace bpmp{
         ros::Publisher fov_sector_marker_publisher_;
         ros::Publisher robot_planning_path_publisher_;
         ros::Publisher target_predicted_path_publisher_;
+        ros::Publisher cur_robot_vel_path_publisher_;
         visualization_msgs::MarkerArray active_obstacle_marker_array_;
 
 

@@ -27,7 +27,7 @@ struct OptimizationParam
 
     // initial covariances (실제로는 EKF/필터에서 받아오는 게 더 맞지만, 최소 구현은 param으로 둠)
     Eigen::Matrix<double, Nx_r, Nx_r> robot_cov0 = Eigen::Matrix<double, Nx_r, Nx_r>::Identity() * 0.001;
-    Eigen::Matrix<double, Nx_t, Nx_t> target_cov0 = Eigen::Matrix<double, Nx_t, Nx_t>::Identity() * 0.001;
+    Eigen::Matrix<double, Nx_t, Nx_t> target_cov0 = Eigen::Matrix<double, Nx_t, Nx_t>::Identity() * 0.005;
 
     // robot kinematic limits
     double v0    = 0.0;   // 초기 v (ROS에서 안 주면 param으로 둠)
@@ -71,6 +71,7 @@ struct OptimizationParam
 
     // gradient FD
     double grad_delta = 1e-6;
+    bool verbose = false;
 };
 
 // ---------- small helpers ----------
@@ -173,6 +174,10 @@ inline double sd_annular_sector_fov(const Eigen::Vector2d& z_world,
     const double y = -s * p.x() + c * p.y();
 
     const double r = std::sqrt(x*x + y*y);
+    if (r < 1e-12) {
+        // at origin, return distance to inner arc
+        return r_min;
+    }
     const double phi = std::atan2(y, x);
 
     auto dist_point_segment = [](double px, double py,
@@ -240,6 +245,15 @@ inline void sd_annular_sector_fov_grad(const Eigen::Vector2d& x_t,
     const double y = -s * dx + c * dy;
 
     const double r = std::sqrt(x*x + y*y);
+    if (r < 1e-12) {
+        // at origin, gradient is undefined
+        dsd_dx_t = -c;
+        dsd_dy_t = -s;
+        dsd_dx_r = -dsd_dx_t;
+        dsd_dy_r = -dsd_dy_t;
+        dsd_dheading = 0.0;
+        return;
+    }
     const double phi = std::atan2(y, x);
 
     const bool inside = (r >= r_min) && (r <= r_max) && (std::abs(phi) <= half);
@@ -459,6 +473,10 @@ inline BeliefT target_step(const BeliefT& b_t,
     const Eigen::Vector2d pr = b_r_next.mean.segment<2>(0);
     const Eigen::Vector2d diff = out.mean - pr;
     const double nr = std::max(1e-12, diff.norm());
+    if (diff.norm() < 1e-12) {
+        out.cov = cov_pred;
+        return out;
+    }
 
     Eigen::Matrix2d c_tild;
     c_tild(0,0) = diff.x()/nr;
@@ -474,10 +492,11 @@ inline BeliefT target_step(const BeliefT& b_t,
 }
 
 // ---------- J_m and gradient ----------
+// template<const int N_, const int Nu_>
 inline void get_J_m_and_constraints(const BeliefR& b_r0,
                                     const BeliefT& b_t0,
                                     const Eigen::Matrix<double, N, Nu>& u_bar,
-                                    const std::vector<Eigen::Vector2d>& obs_centers,
+                                    const Collection<std::vector<Eigen::Vector2d>, N>& obs_centers,
                                     double eta,
                                     double& J_m,
                                     double& constraint_sum,
@@ -503,13 +522,13 @@ inline void get_J_m_and_constraints(const BeliefR& b_r0,
         // Eigen::Vector2d u_t = u_t[k];
 
         double gamma_k = 1.0;
-        bt[k+1] = target_step(bt[k], u_t, br[k+1], obs_centers, gamma_k, p);
+        bt[k+1] = target_step(bt[k], u_t, br[k+1], obs_centers[k], gamma_k, p);
         gamma_list[k] = gamma_k;
 
-        if(obs_centers.empty()){
+        if(obs_centers[k].empty()){
             gamma_ro_list[k] = 0.0;
         }else{
-            gamma_ro_list[k] = gamma_ro_collision_max(br[k+1].mean, br[k+1].cov, obs_centers, p);
+            gamma_ro_list[k] = gamma_ro_collision_max(br[k+1].mean, br[k+1].cov, obs_centers[k], p);
         }
     }
 
@@ -533,11 +552,11 @@ inline void get_J_m_and_constraints(const BeliefR& b_r0,
 
     J_m = J + eta * constraint_sum;
 }
-
+// template<const int N_, const int Nu_>
 inline void get_J_m_grad_FD(const BeliefR& b_r0,
                             const BeliefT& b_t0,
                             const Eigen::Matrix<double, N, Nu>& u_bar,
-                            const std::vector<Eigen::Vector2d>& obs_centers,
+                            const Collection<std::vector<Eigen::Vector2d>, N>& obs_centers,
                             double eta,
                             Eigen::Matrix<double, N, Nu>& grad,
                             double& J_m_base,
@@ -553,9 +572,11 @@ inline void get_J_m_grad_FD(const BeliefR& b_r0,
             Eigen::Matrix<double, N, Nu> u_pert = u_bar;
             u_pert(i,j) += p.grad_delta;
 
-            double Jm_pert, c_pert;
-            get_J_m_and_constraints(b_r0, b_t0, u_pert, obs_centers, eta, Jm_pert, c_pert, p, u_t);
-            grad(i,j) = (Jm_pert - J_m_base) / p.grad_delta;
+            double Jm_pert_forward, Jm_pert_backward, c_pert;
+            get_J_m_and_constraints(b_r0, b_t0, u_pert, obs_centers, eta, Jm_pert_forward, c_pert, p, u_t);
+            u_pert(i,j) -= 2 * p.grad_delta;
+            get_J_m_and_constraints(b_r0, b_t0, u_pert, obs_centers, eta, Jm_pert_backward, c_pert, p, u_t);
+            grad(i,j) = (Jm_pert_forward - Jm_pert_backward) / (2 * p.grad_delta);
         }
     }
 }
@@ -654,11 +675,17 @@ public:
     void Solve() {
         // ---- build obstacle centers (static prediction 최소 구현) ----
         float tic = static_cast<float>(std::clock());
-        std::vector<Eigen::Vector2d> obs_centers;
-        obs_centers.reserve(problem_->obstacle_state_list().size());
-        for(const auto& o : problem_->obstacle_state_list()){
-            obs_centers.emplace_back(o.px, o.py);
+        Collection<std::vector<Eigen::Vector2d>, N_> obs_centers;
+        
+        for (int k = 0; k < N_; k++) {
+            obs_centers[k].clear();
+            obs_centers[k].reserve(problem_->obstacle_state_list().size());
+            for(const auto& o : problem_->obstacle_state_list()){
+                obs_centers[k].emplace_back(o.px + o.vx * (k+1) * param_.time_step, 
+                                            o.py + o.vy * (k+1) * param_.time_step);
         }
+        }
+        
 
         // ---- initial beliefs from ROS states ----
         BeliefR b_r0;
@@ -692,9 +719,25 @@ public:
         int iter_outer = 0;
         int iter_inner = 0;
 
+
         // outer loop (eta)
-        for(int outer=0; outer<param_.max_outer; outer++){
-            iter_outer = outer;
+        // for(int outer=0; outer<param_.max_outer; outer++){
+        while(true){
+            if (eta > param_.eta_max - 1e-6) {
+                if (param_.verbose) {
+                    std::cout << "[bpmp::Optimizer] Penalty eta reached maximum value. Stopping outer loop." << std::endl;
+                }
+                break;
+            }
+            else if (iter_outer >= param_.max_outer) {
+                if (param_.verbose) {
+                    std::cout << "[bpmp::Optimizer] Maximum outer iterations reached. Stopping outer loop." << std::endl;
+                }
+                break;
+            }
+            iter_outer = iter_outer + 1;
+            iter_inner = 0;
+            d = param_.d0;
             // inner SCP loop
             for(int inner=0; inner<param_.max_inner; inner++){
                 iter_inner=inner; 
@@ -718,49 +761,84 @@ public:
 
                 if (actual_dec < 0.0) {
                     d = d * param_.shrink;
+                    if (param_.verbose) {
+                        std::cout << "[bpmp::Optimizer] Negative actual decrease. iter : " << iter_inner
+                                    << " d: " << d << " actual_dec: " << actual_dec << std::endl;
+                    }
+                    if (d <= param_.d_min) {
+                        if (param_.verbose) {
+                            std::cout << "[bpmp::Optimizer] Trust region too small after negative actual decrease. "
+                                        << "iter : " << iter_inner << std::endl;
+                        }
+                        break;
+                    }
                     continue; // reject immediately
                 }
 
                 
                 // double rho = -std::numeric_limits<double>::infinity();
                 // if (predicted_dec > 1e-12) rho = actual_dec / predicted_dec;
-
-                predicted_dec = std::max(predicted_dec, 1e-12); // avoid div0
+                if (predicted_dec <= 0.0) {
+                    predicted_dec = 1e-12; // avoid div0 or negative predicted decrease
+                    if (param_.verbose) {
+                        std::cout << "[bpmp::Optimizer] WARNING: Predicted decrease negative. This should not happen. "
+                        << "Setting denom to small positive value. iter_inner: " << iter_inner << std::endl;
+                    }
+                }
+                
                 double rho = std::max(actual_dec / predicted_dec, 0.0);
 
-                if ((u_star - u_bar).norm() < param_.tau_conv ||
-                   std::abs((J_grad.array() * (u_star - u_bar).array()).sum()) < param_.tau_f) {
-                    u_prev = u_bar;
+                if ((u_star - u_bar).norm() < param_.tau_conv) {
+                    // u_prev = u_bar;
                     u_bar = u_star;
+                    if (param_.verbose) {
+                        std::cout << "[bpmp::Optimizer] Converged by step norm. by (u_star-u_bar) norm. iter : " << iter_inner << std::endl;
+                    }
+                    break; // converged
+                }
+                else if (std::abs((J_grad.array() * (u_star - u_bar).array()).sum()) < param_.tau_f) {
+                    // u_prev = u_bar;
+                    u_bar = u_star;
+                    if (param_.verbose) {
+                        std::cout << "[bpmp::Optimizer] Converged by stationarity. by (J_grad * (u_star-u_bar)) sum. iter : " << iter_inner << std::endl;
+                    }
                     break; // converged
                 }
 
                 if (rho < param_.rho_reject) {
                     // reject: shrink trust region
                     d = std::max(param_.d_min, d * param_.shrink);
+                    if (param_.verbose) {
+                        std::cout << "[bpmp::Optimizer] rho is too small. By rho_reject, Shrinking trust region and retrying."
+                        <<" iter: : " << iter_inner<< " d: " << d << " rho: " << rho << std::endl;
+                    }
                     if (d <= param_.d_min + 1e-6) {
-                        // trust region too small, stop inner loop
+                        if (param_.verbose) {
+                            std::cout << "[bpmp::Optimizer] Trust region radius too small. Stopping inner loop. "
+                                        << "iter : " << iter_inner << std::endl;
+                        }
                         break;
                     }
                     continue;
                 }
                 else if (rho >= param_.rho_expand) {
                     // accept
-                    u_prev = u_bar;
+                    // u_prev = u_bar;
                     u_bar = u_star;
                     d = std::min(param_.d_max, d * param_.expand);
-                    
-                    // // convergence checks
-                    // const double du_norm = (u_star - u_prev).norm(); // NOTE: here zero; use previous
-                    // const double stationarity = std::abs((J_grad.array() * (u_star - u_prev).array()).sum());
-                    // if (stationarity < param_.tau_f || du_norm < param_.tau_conv){
-                    //     break;
-                    // } 
+                    if (param_.verbose) {
+                        std::cout << "[bpmp::Optimizer] Step accepted and trust region expanded. "
+                        <<" iter: : " << iter_inner<< " d: " << d << " rho: " << rho << std::endl;
+                    }
                 }
                 else{
                     // accept
                     u_prev = u_bar;
                     u_bar = u_star;
+                    if (param_.verbose) {
+                        std::cout << "[bpmp::Optimizer] Step accepted without expansion. "
+                        <<" iter: : " << iter_inner<< " d: " << d << " rho: " << rho << std::endl;
+                    }
                     // no trust region change
                 }
             }
@@ -770,8 +848,15 @@ public:
             get_J_m_and_constraints(b_r0, b_t0, u_bar, obs_centers, eta, Jm_final, c_final, param_, u_t);
 
             if (c_final <= param_.tau_p) {
+                if (param_.verbose) {
+                    std::cout << "[bpmp::Optimizer] All constraints satisfied. Stopping outer loop. iter_outer: " << iter_outer << std::endl;
+                }
                 break;
             } else {
+                if (param_.verbose) {
+                    std::cout << "[bpmp::Optimizer] Outer iter " << iter_outer << " completed. Constraint violation: "
+                                << c_final << ". Increasing penalty eta." << std::endl;
+                }
                 eta = std::min(param_.eta_max, eta * param_.beta);
             }
         }
@@ -782,7 +867,7 @@ public:
         }
         float toc = static_cast<float>(std::clock());
         float elapsed = (toc - tic) / CLOCKS_PER_SEC;
-        std::cout << "[bpmp::Optimizer] Iterations: outer = " << iter_outer << ", inner = " << iter_inner << "Solve() time: " << elapsed << " sec" << std::endl;;
+        std::cout << "[bpmp::Optimizer] Iterations: outer = " << iter_outer << ", inner = " << iter_inner << " Solve() time: " << elapsed << " sec" << std::endl;
     }
 
     const Collection<VectorU, N_>& solution() const { return u_sol_; }

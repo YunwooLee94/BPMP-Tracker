@@ -11,6 +11,14 @@ bpmp::Baseline::Baseline(): nh_("~") {
     nh_.param<double>("v0",    param_.v0,    0.0);
     nh_.param<double>("v_max", param_.v_max, 1.0);
 
+    double cov_temp;
+    nh_.param<double>("robot_process_noise", cov_temp, 0.05);
+    param_.robot_process_noise = Eigen::Matrix<double, Nx_r, Nx_r>::Identity() * cov_temp;
+    nh_.param<double>("target_process_noise", cov_temp, 0.1);
+    param_.target_process_noise = Eigen::Matrix<double, Nx_t, Nx_t>::Identity() * cov_temp;
+    nh_.param<double>("target_sensor_noise",  cov_temp,  0.05);
+    param_.target_sensor_noise = Eigen::Matrix<double, 2, 2>::Identity() * cov_temp;
+
     nh_.param<double>("obs_radius", param_.obs_radius, 0.5);
 
     nh_.param<double>("fov_angle", param_.fov_angle, M_PI/3.0);
@@ -39,6 +47,7 @@ bpmp::Baseline::Baseline(): nh_("~") {
     nh_.param<double>("tau_f", param_.tau_f, 1e-5);
 
     nh_.param<double>("grad_delta", param_.grad_delta, 1e-6);
+    nh_.param<bool>("verbose", param_.verbose, false);
 
     // ---- SUBSCRIBER ----
     tracker_state_subscriber_ = nh_.subscribe("/base_odom", 1,
@@ -59,6 +68,8 @@ bpmp::Baseline::Baseline(): nh_("~") {
         nh_.advertise<visualization_msgs::Marker>("/robot_planning_path", 1);
     target_predicted_path_publisher_ =
         nh_.advertise<visualization_msgs::Marker>("/target_predicted_path", 1);
+    cur_robot_vel_path_publisher_ =
+        nh_.advertise<visualization_msgs::Marker>("/cur_robot_vel_path", 1);
 
 }
 
@@ -88,6 +99,7 @@ void bpmp::Baseline::MakeControl() {
     static bool has_prev = false;
     static double prev_time = 0.0;
     static Collection<Eigen::Matrix<double,Nu,1>,N> u_prev;
+    static double prev_control_v = 0.0;
 
     Collection<Eigen::Matrix<double,Nu,1>,N> u0;
     if(!has_prev){
@@ -96,10 +108,14 @@ void bpmp::Baseline::MakeControl() {
         }
         prev_time = ros::Time::now().toSec();
     }else{
-        for(int k=0;k<N-1;k++){
-            u0[k] = u_prev[k+1];
-        }
-        u0[N-1] = u_prev[N-1];
+        // ver1 : shift left by one, repeat last
+        // for(int k=0;k<N-1;k++){
+        //     u0[k] = u_prev[k+1];
+        // }
+        // u0[N-1] = u_prev[N-1];
+
+        // ver2 : use previous control as initial guess without shifting
+        // u0 = u_prev;
     }
 
     // build problem
@@ -135,7 +151,11 @@ void bpmp::Baseline::MakeControl() {
     double dt = ros::Time::now().toSec() - prev_time;
     prev_time = ros::Time::now().toSec();
     double acc = std::max(std::min(u_sol[0](1), param_.a_max), param_.a_min); // a (acceleration)
-    cmd.vel_linear = std::max(std::min(current_tracker_state_.velocity + acc * dt, param_.v_max), -param_.v_max); // v = v0 + a*dt
+    // cmd.vel_linear = std::max(std::min(current_tracker_state_.velocity + acc * dt, param_.v_max), -param_.v_max); // v = v0 + a*dt
+    std::cout << "[Baseline] Current velocity: " << current_tracker_state_.velocity << ", Acc: " << acc << ", prev_control_v: " << prev_control_v << ", dt: " << dt << std::endl;
+    cmd.vel_linear = std::max(std::min(prev_control_v + acc * dt, param_.v_max), -param_.v_max); // v = v0 + a*dt
+    prev_control_v = cmd.vel_linear;
+    current_tracker_state_.velocity = cmd.vel_linear; // update current velocity
     tracker_control_input_publisher_.publish(cmd);
 
     // publish robot planning path marker
@@ -170,7 +190,7 @@ void bpmp::Baseline::MakeControl() {
         xk(0) += v * cos(theta) * param_.time_step;
         xk(1) += v * sin(theta) * param_.time_step;
         xk(2) += w * param_.time_step;
-        xk(3) += a * param_.time_step;
+        xk(3) = std::min(std::max(xk(3) + a * param_.time_step, -param_.v_max), param_.v_max);
         // add to marker
         geometry_msgs::Point p;
         p.x = xk(0);
@@ -223,6 +243,43 @@ void bpmp::Baseline::MakeControl() {
         target_path_marker.points.push_back(p);
     }
     target_predicted_path_publisher_.publish(target_path_marker);
+
+    // publish current robot velocity vector marker
+    visualization_msgs::Marker vel_marker;
+    vel_marker.header.frame_id = "map";
+    vel_marker.ns = "cur_robot_vel_path";
+    vel_marker.id = 0;
+    vel_marker.type = visualization_msgs::Marker::LINE_STRIP;
+    vel_marker.action = visualization_msgs::Marker::ADD;
+    vel_marker.scale.x = 0.2; // shaft diameter
+    vel_marker.scale.y = 0.4; // head diameter
+    vel_marker.scale.z = 0.4; // head length
+    vel_marker.color.r = 0.8;
+    vel_marker.color.g = 0.2;
+    vel_marker.color.b = 0.2;
+    vel_marker.color.a = 0.9;
+    vel_marker.lifetime = ros::Duration(0.2);
+    // start point
+    geometry_msgs::Point sp;
+    sp.x = current_tracker_state_.px;
+    sp.y = current_tracker_state_.py;
+    sp.z = 0.1;
+    vel_marker.points.push_back(sp);
+    // intermediate point (for better visibility, constant velocity assumption)
+    double next_x = current_tracker_state_.px;
+    double next_y = current_tracker_state_.py;
+    double next_theta = current_tracker_state_.theta;
+    for (int i = 1; i <= N; i++) {
+        geometry_msgs::Point mp;
+        next_x += (current_tracker_state_.velocity * cos(next_theta)) * param_.time_step;
+        next_y += (current_tracker_state_.velocity * sin(next_theta)) * param_.time_step;
+        next_theta += (cmd.vel_angular) * param_.time_step; // assuming constant angular velocity
+        mp.x = next_x;
+        mp.y = next_y;
+        mp.z = 0.1;
+        vel_marker.points.push_back(mp);
+    }
+    cur_robot_vel_path_publisher_.publish(vel_marker);
 
 }
 
@@ -327,6 +384,7 @@ void bpmp::Baseline::TrackerStateCallback(const nav_msgs::Odometry::ConstPtr &ms
         prev_tracker_time_ = t_cur;
         prev_tracker_state_.px = msg->pose.pose.position.x;
         prev_tracker_state_.py = msg->pose.pose.position.y;
+        prev_tracker_state_.velocity = 0.0;
     }
     else{;
         dt = (t_cur - prev_tracker_time_);
@@ -359,7 +417,8 @@ void bpmp::Baseline::TrackerStateCallback(const nav_msgs::Odometry::ConstPtr &ms
     int velocity_sign = (vx * cos(current_tracker_state_.theta) + vy * sin(current_tracker_state_.theta) >= 0) ? 1 : -1;
     // double cur_vel = velocity_sign * std::min(std::hypot(vx, vy), param_.v_max);
     // current_tracker_state_.velocity = current_tracker_state_.velocity*0.8 + cur_vel*0.2; // low-pass filter
-    current_tracker_state_.velocity = velocity_sign * std::min(std::hypot(vx, vy), param_.v_max);
+    // current_tracker_state_.velocity = velocity_sign * std::min(std::hypot(vx, vy), param_.v_max);
+    // current_tracker_state_.velocity = velocity_sign * std::hypot(vx, vy);
 
     // [ADD] FOV sector marker publish
     visualization_msgs::Marker fov_marker;
