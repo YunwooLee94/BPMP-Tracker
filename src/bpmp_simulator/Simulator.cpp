@@ -26,7 +26,7 @@ void bpmp::Simulator::Run() {
         int success_count = 0;
         int episode_count = 0;
         int object_file_count = 0;
-        int object_file_number = 3;
+        int object_file_number = 5;
         bool fail_flag_target = false;
         bool fail_flag_obstacle = false;
         bool fail_flag_fov = false;
@@ -45,7 +45,7 @@ void bpmp::Simulator::Run() {
                 test_cnt = 1;
                 scenario_count = 0;
                 success_count = 0;
-                object_history_file_name_ = object_history_file_path_name_+"/gar_"+std::to_string(++object_file_count)+".csv";
+                object_history_file_name_ = object_history_file_path_name_+"/gar_"+std::to_string(++object_file_count+1)+".csv";
                 ReadObjectTrajectory();
             }
             t_sim = ros::Time::now().toSec() - t0;
@@ -276,6 +276,7 @@ bpmp::Simulator::Simulator() : nh_("~") {
     gar_robot_publisher_ = nh_.advertise<visualization_msgs::Marker>("robot_vis",1);
     fov_publisher_ = nh_.advertise<visualization_msgs::Marker>("fov_vis",1);
     obstacle_path_list_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("obstacle_path_vis",1);
+    object_history_file_name_ = object_history_file_path_name_+"/gar_"+std::to_string(1)+".csv";
     if(analysis_mode_){
         ReadObjectTrajectory();
         ShuffleScenario();
@@ -335,7 +336,6 @@ bpmp::Simulator::Simulator() : nh_("~") {
 
 void bpmp::Simulator::ReadObjectTrajectory() {
     ifstream object_trajectory_file;
-    object_history_file_name_ = object_history_file_path_name_+"/gar_1"+".csv";
     object_trajectory_file.open(object_history_file_name_.c_str());
     object_history_list_.clear();	
     int num_read_unit = 12;
