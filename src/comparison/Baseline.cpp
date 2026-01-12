@@ -19,7 +19,8 @@ bpmp::Baseline::Baseline(): nh_("~") {
     nh_.param<double>("target_sensor_noise",  cov_temp,  0.05);
     param_.target_sensor_noise = Eigen::Matrix<double, 2, 2>::Identity() * cov_temp;
 
-    nh_.param<double>("obs_radius", param_.obs_radius, 0.5);
+    nh_.param<double>("obs_radius", param_.obs_radius, 0.25);
+    nh_.param<double>("robot_radius", param_.robot_radius, 0.25);
 
     nh_.param<double>("fov_angle", param_.fov_angle, M_PI/3.0);
     nh_.param<double>("r_min", param_.r_min, 1.0);

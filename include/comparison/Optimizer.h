@@ -42,7 +42,8 @@ struct OptimizationParam
     double r_max = 10.0;
 
     // obstacle
-    double obs_radius = 0.5;
+    double obs_radius = 0.25;
+    double robot_radius = 0.25;
 
     // merit parameters
     std::string function_J = "2";          // "1": entropy sum, "2": -sum(gamma_k)
@@ -396,7 +397,7 @@ inline double gamma_ro_collision_max(const Eigen::Matrix<double, Nx_r, 1>& mu_r,
 
     double worst = 0.0;
     for(const auto& c : obs_centers){
-        const double sd = sd_robot_obstacle(pr, c, p.obs_radius);
+        const double sd = sd_robot_obstacle(pr, c, p.obs_radius + p.robot_radius);
         const Eigen::Vector2d g = sd_robot_obstacle_grad(pr, c);
         const double var = g.transpose() * Sigma_r_xy * g;
         const double gamma = phi_from_sd(sd, var, /*sense_leq=*/true); // collision event: sd<=0
