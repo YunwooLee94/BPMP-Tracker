@@ -33,8 +33,8 @@ struct OptimizationParam
     double v0    = 0.0;   // 초기 v (ROS에서 안 주면 param으로 둠)
     double v_max = 1.0;
     double w_max = 1.0;   // |omega| <= w_max
-    double a_min = -1.0;
-    double a_max =  1.0;
+    // double a_min = -1.0;
+    // double a_max =  1.0;
 
     // FOV params (annular sector)
     double fov_angle = M_PI/3.0; // rad
@@ -416,29 +416,28 @@ struct BeliefT {
 };
 
 inline BeliefR robot_step(const BeliefR& b_r,
-                          const Eigen::Vector2d& u, // [w,a]
+                          const Eigen::Vector2d& u, // [w,v]
                           const OptimizationParam& p)
 {
     const double x = b_r.mean(0);
     const double y = b_r.mean(1);
     const double th = b_r.mean(2);
-    const double v = b_r.mean(3);
+    // const double v = b_r.mean(3);
 
     const double w = u(0);
-    const double a = u(1);
+    const double v = u(1);
 
     BeliefR out;
     out.mean(0) = x + v * std::cos(th) * p.time_step;
     out.mean(1) = y + v * std::sin(th) * p.time_step;
     out.mean(2) = th + w * p.time_step;
     // out.mean(3) = clip(v + a * p.time_step, -p.v_max, p.v_max);
-    out.mean(3) = v + a * p.time_step;
 
     Eigen::Matrix<double, Nx_r, Nx_r> A = Eigen::Matrix<double, Nx_r, Nx_r>::Identity();
     A(0,2) = -v * std::sin(th) * p.time_step;
-    A(0,3) =  std::cos(th) * p.time_step;
+    // A(0,3) =  std::cos(th) * p.time_step;
     A(1,2) =  v * std::cos(th) * p.time_step;
-    A(1,3) =  std::sin(th) * p.time_step;
+    // A(1,3) =  std::sin(th) * p.time_step;
 
     out.cov = A * b_r.cov * A.transpose() + p.robot_process_noise;
     return out;
@@ -592,21 +591,21 @@ inline void solve_trust_region_inf(const Eigen::Matrix<double, N, Nu>& u_ref,
                                   const OptimizationParam& p)
 {
     // normalize to [0,1] for both channels (python 의도대로)
-    auto normalize = [&](double w, double a)->Eigen::Vector2d{
+    auto normalize = [&](double w, double v)->Eigen::Vector2d{
         const double w_n = (w + p.w_max) / (2.0 * p.w_max);          // [-wmax,wmax] -> [0,1]
-        const double a_n = (a - p.a_min) / (p.a_max - p.a_min);      // [amin,amax] -> [0,1]
-        return Eigen::Vector2d(w_n, a_n);
+        const double v_n = (v + p.v_max) / (2.0 * p.v_max);      // [-vmax,vmax] -> [0,1]
+        return Eigen::Vector2d(w_n, v_n);
     };
-    auto denormalize = [&](double w_n, double a_n)->Eigen::Vector2d{
+    auto denormalize = [&](double w_n, double v_n)->Eigen::Vector2d{
         const double w = (2.0*p.w_max)*w_n - p.w_max;
-        const double a = (p.a_max - p.a_min)*a_n + p.a_min;
-        return Eigen::Vector2d(w, a);
+        const double v = (2.0*p.v_max)*v_n - p.v_max;
+        return Eigen::Vector2d(w, v);
     };
 
     // scale gradient for normalized variables
     Eigen::Matrix<double, N, Nu> grad_n = J_grad;
     grad_n.col(0) *= (2.0 * p.w_max);
-    grad_n.col(1) *= (p.a_max - p.a_min);
+    grad_n.col(1) *= (2.0 * p.v_max);
 
     // build u_ref_norm
     Eigen::Matrix<double, N, Nu> uref_n;
@@ -641,7 +640,7 @@ inline void solve_trust_region_inf(const Eigen::Matrix<double, N, Nu>& u_ref,
         Eigen::Vector2d uu = denormalize(ustar_n(k,0), ustar_n(k,1));
         // enforce true bounds (safety)
         uu(0) = clip(uu(0), -p.w_max, p.w_max);
-        uu(1) = clip(uu(1),  p.a_min, p.a_max);
+        uu(1) = clip(uu(1), -p.v_max, p.v_max);
 
         u_star.row(k) = uu.transpose();
     }
@@ -694,7 +693,7 @@ public:
         b_r0.mean(0) = problem_->tracker_state().px;
         b_r0.mean(1) = problem_->tracker_state().py;
         b_r0.mean(2) = problem_->tracker_state().theta;
-        b_r0.mean(3) = param_.v0;
+        // b_r0.mean(3) = param_.v0;
         b_r0.cov = param_.robot_cov0;
 
         BeliefT b_t0;
@@ -868,7 +867,9 @@ public:
         }
         float toc = static_cast<float>(std::clock());
         float elapsed = (toc - tic) / CLOCKS_PER_SEC;
-        std::cout << "[bpmp::Optimizer] Iterations: outer = " << iter_outer << ", inner = " << iter_inner << " Solve() time: " << elapsed << " sec" << std::endl;
+        if (param_.verbose){
+            std::cout << "[bpmp::Optimizer] Iterations: outer = " << iter_outer << ", inner = " << iter_inner << " Solve() time: " << elapsed << " sec" << std::endl;
+        }   
     }
 
     const Collection<VectorU, N_>& solution() const { return u_sol_; }

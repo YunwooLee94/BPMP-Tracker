@@ -15,8 +15,8 @@ const int Nu = 2;
 // const int Nc = 10;
 
 // Belief dimensions used inside SCP cost evaluation
-// robot belief: [x,y,theta,v], target belief: [x,y]
-const int Nx_r = 4;
+// robot belief: [x,y,theta], target belief: [x,y]
+const int Nx_r = 3;
 const int Nx_t = 2;
 
 #endif

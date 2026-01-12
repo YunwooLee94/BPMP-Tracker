@@ -6,8 +6,8 @@ bpmp::Baseline::Baseline(): nh_("~") {
     nh_.param<double>("time_step", param_.time_step, 0.5);
 
     nh_.param<double>("w_max", param_.w_max, 1.0);
-    nh_.param<double>("a_min", param_.a_min, -1.0);
-    nh_.param<double>("a_max", param_.a_max,  1.0);
+    // nh_.param<double>("a_min", param_.a_min, -1.0);
+    // nh_.param<double>("a_max", param_.a_max,  1.0);
     nh_.param<double>("v0",    param_.v0,    0.0);
     nh_.param<double>("v_max", param_.v_max, 1.0);
 
@@ -97,16 +97,16 @@ bool bpmp::Baseline::is_info_received() {
 void bpmp::Baseline::MakeControl() {
     // ---- warm start (paper: extrapolate previous solution) ----
     static bool has_prev = false;
-    static double prev_time = 0.0;
+    // static double prev_time = 0.0;
     static Collection<Eigen::Matrix<double,Nu,1>,N> u_prev;
-    static double prev_control_v = 0.0;
+    // static double prev_control_v = 0.0;
 
     Collection<Eigen::Matrix<double,Nu,1>,N> u0;
     if(!has_prev){
         for(int k=0;k<N;k++){
             u0[k] = (Eigen::Matrix<double,Nu,1>() << 0.0, 0.0).finished();
         }
-        prev_time = ros::Time::now().toSec();
+        // prev_time = ros::Time::now().toSec();
     }else{
         // ver1 : shift left by one, repeat last
         // for(int k=0;k<N-1;k++){
@@ -128,8 +128,7 @@ void bpmp::Baseline::MakeControl() {
     x0_new = (Eigen::Matrix<double,Nx_r,1>()<<
               current_tracker_state_.px,
               current_tracker_state_.py,
-              current_tracker_state_.theta,
-              current_tracker_state_.velocity).finished();
+              current_tracker_state_.theta).finished();
 
     Collection<Eigen::Matrix<double,Nu,1>,N> uN_new = u0;
 
@@ -145,17 +144,21 @@ void bpmp::Baseline::MakeControl() {
     // ---- publish first control ----
     bpmp_tracker::UnicycleInput cmd;
     // UnicycleInput.msg: vel_linear, vel_angular
-    cmd.vel_angular = std::max(std::min(u_sol[0](0), param_.w_max), -param_.w_max);  // w (angular velocity)
+    // cmd.vel_angular = std::max(std::min(u_sol[0](0), param_.w_max), -param_.w_max);  // w (angular velocity)
     // cmd.vel_linear = u_sol[0](1);   // a (acceleration/linear velocity)
     // -> 수정: UnicycleInput에서 vel_linear는 속도이므로, 현재 속도 + 가속도로 설정
-    double dt = ros::Time::now().toSec() - prev_time;
-    prev_time = ros::Time::now().toSec();
-    double acc = std::max(std::min(u_sol[0](1), param_.a_max), param_.a_min); // a (acceleration)
+    // double dt = ros::Time::now().toSec() - prev_time;
+    // prev_time = ros::Time::now().toSec();
+    // double acc = std::max(std::min(u_sol[0](1), param_.a_max), param_.a_min); // a (acceleration)
     // cmd.vel_linear = std::max(std::min(current_tracker_state_.velocity + acc * dt, param_.v_max), -param_.v_max); // v = v0 + a*dt
-    std::cout << "[Baseline] Current velocity: " << current_tracker_state_.velocity << ", Acc: " << acc << ", prev_control_v: " << prev_control_v << ", dt: " << dt << std::endl;
-    cmd.vel_linear = std::max(std::min(prev_control_v + acc * dt, param_.v_max), -param_.v_max); // v = v0 + a*dt
-    prev_control_v = cmd.vel_linear;
-    current_tracker_state_.velocity = cmd.vel_linear; // update current velocity
+    // std::cout << "[Baseline] Current velocity: " << current_tracker_state_.velocity << ", Acc: " << acc << ", prev_control_v: " << prev_control_v << ", dt: " << dt << std::endl;
+    // cmd.vel_linear = std::max(std::min(prev_control_v + acc * dt, param_.v_max), -param_.v_max); // v = v0 + a*dt
+    // prev_control_v = cmd.vel_linear;
+    // current_tracker_state_.velocity = cmd.vel_linear; // update current velocity
+
+    cmd.vel_angular = std::max(std::min(u_sol[0](0), param_.w_max), -param_.w_max);  // w (angular velocity)
+    cmd.vel_linear = std::max(std::min(u_sol[0](1), param_.v_max), -param_.v_max);  // v (linear velocity)
+
     tracker_control_input_publisher_.publish(cmd);
 
     // publish robot planning path marker
@@ -183,15 +186,14 @@ void bpmp::Baseline::MakeControl() {
     for(int k=0; k<N; k++){
         // simulate one step
         double theta = xk(2);
-        double v = xk(3);
+        // double v = xk(3);
         double w = u_sol[k](0);
-        double a = u_sol[k](1);
+        double v = u_sol[k](1);
         // Euler integration
         xk(0) += v * cos(theta) * param_.time_step;
         xk(1) += v * sin(theta) * param_.time_step;
         xk(2) += w * param_.time_step;
         // xk(3) = std::min(std::max(xk(3) + a * param_.time_step, -param_.v_max), param_.v_max);
-        xk(3) += a * param_.time_step;
         // add to marker
         geometry_msgs::Point p;
         p.x = xk(0);
@@ -246,41 +248,41 @@ void bpmp::Baseline::MakeControl() {
     target_predicted_path_publisher_.publish(target_path_marker);
 
     // publish current robot velocity vector marker
-    visualization_msgs::Marker vel_marker;
-    vel_marker.header.frame_id = "map";
-    vel_marker.ns = "cur_robot_vel_path";
-    vel_marker.id = 0;
-    vel_marker.type = visualization_msgs::Marker::LINE_STRIP;
-    vel_marker.action = visualization_msgs::Marker::ADD;
-    vel_marker.scale.x = 0.2; // shaft diameter
-    vel_marker.scale.y = 0.4; // head diameter
-    vel_marker.scale.z = 0.4; // head length
-    vel_marker.color.r = 0.8;
-    vel_marker.color.g = 0.2;
-    vel_marker.color.b = 0.2;
-    vel_marker.color.a = 0.9;
-    vel_marker.lifetime = ros::Duration(0.2);
-    // start point
-    geometry_msgs::Point sp;
-    sp.x = current_tracker_state_.px;
-    sp.y = current_tracker_state_.py;
-    sp.z = 0.1;
-    vel_marker.points.push_back(sp);
-    // intermediate point (for better visibility, constant velocity assumption)
-    double next_x = current_tracker_state_.px;
-    double next_y = current_tracker_state_.py;
-    double next_theta = current_tracker_state_.theta;
-    for (int i = 1; i <= N; i++) {
-        geometry_msgs::Point mp;
-        next_x += (current_tracker_state_.velocity * cos(next_theta)) * param_.time_step;
-        next_y += (current_tracker_state_.velocity * sin(next_theta)) * param_.time_step;
-        next_theta += (cmd.vel_angular) * param_.time_step; // assuming constant angular velocity
-        mp.x = next_x;
-        mp.y = next_y;
-        mp.z = 0.1;
-        vel_marker.points.push_back(mp);
-    }
-    cur_robot_vel_path_publisher_.publish(vel_marker);
+    // visualization_msgs::Marker vel_marker;
+    // vel_marker.header.frame_id = "map";
+    // vel_marker.ns = "cur_robot_vel_path";
+    // vel_marker.id = 0;
+    // vel_marker.type = visualization_msgs::Marker::LINE_STRIP;
+    // vel_marker.action = visualization_msgs::Marker::ADD;
+    // vel_marker.scale.x = 0.2; // shaft diameter
+    // vel_marker.scale.y = 0.4; // head diameter
+    // vel_marker.scale.z = 0.4; // head length
+    // vel_marker.color.r = 0.8;
+    // vel_marker.color.g = 0.2;
+    // vel_marker.color.b = 0.2;
+    // vel_marker.color.a = 0.9;
+    // vel_marker.lifetime = ros::Duration(0.2);
+    // // start point
+    // geometry_msgs::Point sp;
+    // sp.x = current_tracker_state_.px;
+    // sp.y = current_tracker_state_.py;
+    // sp.z = 0.1;
+    // vel_marker.points.push_back(sp);
+    // // intermediate point (for better visibility, constant velocity assumption)
+    // double next_x = current_tracker_state_.px;
+    // double next_y = current_tracker_state_.py;
+    // double next_theta = current_tracker_state_.theta;
+    // for (int i = 1; i <= N; i++) {
+    //     geometry_msgs::Point mp;
+    //     next_x += (current_tracker_state_.velocity * cos(next_theta)) * param_.time_step;
+    //     next_y += (current_tracker_state_.velocity * sin(next_theta)) * param_.time_step;
+    //     next_theta += (cmd.vel_angular) * param_.time_step; // assuming constant angular velocity
+    //     mp.x = next_x;
+    //     mp.y = next_y;
+    //     mp.z = 0.1;
+    //     vel_marker.points.push_back(mp);
+    // }
+    // cur_robot_vel_path_publisher_.publish(vel_marker);
 
 }
 
@@ -368,38 +370,38 @@ bool bpmp::Baseline::isInFOV(bpmp::State obstacle_state) {
 }
 
 void bpmp::Baseline::TrackerStateCallback(const nav_msgs::Odometry::ConstPtr &msg) {
-    double vx = 0.0;
-    double vy = 0.0;
-    double dt = 0.0;
-    double t_cur = ros::Time::now().toSec();
-    if (!is_tracker_info_received) {
-        // copy initial odom
-        prev_tracker_time_ = t_cur;
-        prev_tracker_state_.px = msg->pose.pose.position.x;
-        prev_tracker_state_.py = msg->pose.pose.position.y;
-    }
-    else if(std::hypot(prev_tracker_state_.px-msg->pose.pose.position.x,
-                    prev_tracker_state_.py-msg->pose.pose.position.y) > 0.1) {
-        // pose is jumped!!
-        cout << "[Baseline] Warning: Tracker odometry jumped. Resetting velocity to zero." << endl;
-        prev_tracker_time_ = t_cur;
-        prev_tracker_state_.px = msg->pose.pose.position.x;
-        prev_tracker_state_.py = msg->pose.pose.position.y;
-        prev_tracker_state_.velocity = 0.0;
-    }
-    else{;
-        dt = (t_cur - prev_tracker_time_);
-        if (dt <= 1e-6) { 
-            cout << "[Baseline] Warning: Non-positive time difference in tracker odometry. Setting dt to 1e-6." << endl;
-            cout << msg->header.stamp.toSec() << endl;
-            dt = 1e-6; // to avoid zero division
-        }
-        vx = (msg->pose.pose.position.x - prev_tracker_state_.px) / (dt);
-        vy = (msg->pose.pose.position.y - prev_tracker_state_.py) / (dt);
-        prev_tracker_state_.px = msg->pose.pose.position.x;
-        prev_tracker_state_.py = msg->pose.pose.position.y;
-        prev_tracker_time_ = t_cur;
-    }
+    // double vx = 0.0;
+    // double vy = 0.0;
+    // double dt = 0.0;
+    // double t_cur = ros::Time::now().toSec();
+    // if (!is_tracker_info_received) {
+    //     // copy initial odom
+    //     prev_tracker_time_ = t_cur;
+    //     prev_tracker_state_.px = msg->pose.pose.position.x;
+    //     prev_tracker_state_.py = msg->pose.pose.position.y;
+    // }
+    // else if(std::hypot(prev_tracker_state_.px-msg->pose.pose.position.x,
+    //                 prev_tracker_state_.py-msg->pose.pose.position.y) > 0.1) {
+    //     // pose is jumped!!
+    //     cout << "[Baseline] Warning: Tracker odometry jumped. Resetting velocity to zero." << endl;
+    //     prev_tracker_time_ = t_cur;
+    //     prev_tracker_state_.px = msg->pose.pose.position.x;
+    //     prev_tracker_state_.py = msg->pose.pose.position.y;
+    //     prev_tracker_state_.velocity = 0.0;
+    // }
+    // else{;
+    //     dt = (t_cur - prev_tracker_time_);
+    //     if (dt <= 1e-6) { 
+    //         cout << "[Baseline] Warning: Non-positive time difference in tracker odometry. Setting dt to 1e-6." << endl;
+    //         cout << msg->header.stamp.toSec() << endl;
+    //         dt = 1e-6; // to avoid zero division
+    //     }
+    //     vx = (msg->pose.pose.position.x - prev_tracker_state_.px) / (dt);
+    //     vy = (msg->pose.pose.position.y - prev_tracker_state_.py) / (dt);
+    //     prev_tracker_state_.px = msg->pose.pose.position.x;
+    //     prev_tracker_state_.py = msg->pose.pose.position.y;
+    //     prev_tracker_time_ = t_cur;
+    // }
     is_tracker_info_received = true;
     
 
@@ -415,7 +417,7 @@ void bpmp::Baseline::TrackerStateCallback(const nav_msgs::Odometry::ConstPtr &ms
             2.0 * (q[0] * q[3] + q[1] * q[2]),
             1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3])
     );
-    int velocity_sign = (vx * cos(current_tracker_state_.theta) + vy * sin(current_tracker_state_.theta) >= 0) ? 1 : -1;
+    // int velocity_sign = (vx * cos(current_tracker_state_.theta) + vy * sin(current_tracker_state_.theta) >= 0) ? 1 : -1;
     // double cur_vel = velocity_sign * std::min(std::hypot(vx, vy), param_.v_max);
     // current_tracker_state_.velocity = current_tracker_state_.velocity*0.8 + cur_vel*0.2; // low-pass filter
     // current_tracker_state_.velocity = velocity_sign * std::min(std::hypot(vx, vy), param_.v_max);
@@ -461,28 +463,8 @@ void bpmp::Baseline::TrackerStateCallback(const nav_msgs::Odometry::ConstPtr &ms
     p.y = current_tracker_state_.py + param_.r_max * sin(angle_right);
     p.z = 1.0;
     fov_marker.points.push_back(p);
-
-    // geometry_msgs::Point p_start;
-    // p_start.x = current_tracker_state_.px;
-    // p_start.y = current_tracker_state_.py;
-    // p_start.z = 1.0;
-    // geometry_msgs::Point p_left;
-    // p_left.x = current_tracker_state_.px + param_.r_max * cos(angle_left);
-    // p_left.y = current_tracker_state_.py + param_.r_max * sin(angle_left);
-    // p_left.z = 1.0;
-    // geometry_msgs::Point p_right;
-    // p_right.x = current_tracker_state_.px + param_.r_max * cos(angle_right);
-    // p_right.y = current_tracker_state_.py + param_.r_max * sin(angle_right);
-    // p_right.z = 1.0;
-    // geometry_msgs::Point p_end;
-    // p_end.x = current_tracker_state_.px;
-    // p_end.y = current_tracker_state_.py;
-    // p_end.z = 1.0;
-    // fov_marker.points.push_back(p_start);
-    // fov_marker.points.push_back(p_left);
-    // fov_marker.points.push_back(p_right);
-    // fov_marker.points.push_back(p_end);
     fov_sector_marker_publisher_.publish(fov_marker);
+
 }
 
 void bpmp::Baseline::TargetStateCallback(const bpmp_tracker::ObjectState &msg) {
