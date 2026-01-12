@@ -8,11 +8,11 @@ a_max :  1.0
 
 # FOV params (annular sector)
 fov_angle : 1.7453292519943295  # 100 degrees in radians
-r_min: 0.5
-r_max: 1.5
+r_min: 0.3
+r_max: 1.7
 
 # obstacle
-obs_radius : 0.25
+obs_radius : 0.5
 
 # merit parameters
 function_J : "2"          # "1": entropy sum, "2": -sum(gamma_k)

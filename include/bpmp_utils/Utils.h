@@ -92,7 +92,7 @@ namespace bpmp{
         double px;
         double py;
         double theta;
-        double velocity;
+        // double velocity;
     };
     struct UnicycleControlInputBaseline{
         double acceleration;

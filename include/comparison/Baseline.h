@@ -20,8 +20,8 @@ namespace bpmp{
         // CONTROLLER VARIABLE
         bpmp::TargetStateBaseline current_target_state_;
         vector<bpmp::State> current_obstacle_state_list_;
-        bpmp::UnicycleStateBaseline current_tracker_state_;
-        bpmp::UnicycleStateBaseline prev_tracker_state_;
+        bpmp::UnicycleState current_tracker_state_;
+        bpmp::UnicycleState prev_tracker_state_;
         double prev_tracker_time_{0.0};
 
         OptimizationParam param_;
