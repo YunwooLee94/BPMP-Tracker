@@ -10,7 +10,7 @@ w_max : 3.141592   # |omega| <= w_max
 #fov_angle : 1.7453292519943295  # 100 degrees in radians
 fov_angle : 2.0944 # 120 degerees
 r_min: 0.25
-r_max: 1.75
+r_max: 2.0
 
 # obstacle
 obs_radius : 0.25
