@@ -9,7 +9,6 @@ Panels:
         - /ActiveObstacle1
         - /MarkerArray3
         - /Marker3
-        - /Marker3/Status1
         - /Marker4
         - /Marker4/Status1
       Splitter Ratio: 0.3984000086784363
@@ -258,41 +257,7 @@ Visualization Manager:
       Marker Topic: /bpmp_simulator/obstacle_list_vis
       Name: MarkerArray
       Namespaces:
-        0: true
-        1: true
-        10: true
-        11: true
-        12: true
-        13: true
-        14: true
-        15: true
-        16: true
-        17: true
-        18: true
-        19: true
-        2: true
-        20: true
-        21: true
-        22: true
-        23: true
-        24: true
-        25: true
-        26: true
-        27: true
-        28: true
-        29: true
-        3: true
-        30: true
-        31: true
-        32: true
-        33: true
-        34: true
-        4: true
-        5: true
-        6: true
-        7: true
-        8: true
-        9: true
+        {}
       Queue Size: 1
       Value: true
     - Alpha: 1
@@ -412,7 +377,7 @@ Visualization Manager:
       Marker Topic: /active_obstacle_list
       Name: MarkerArray
       Namespaces:
-        active_obstacle: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -437,6 +402,14 @@ Visualization Manager:
       Name: Marker
       Namespaces:
         target_predicted_path: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /cur_robot_vel_path
+      Name: Marker
+      Namespaces:
+        cur_robot_vel_path: true
       Queue Size: 100
       Value: true
   Enabled: true

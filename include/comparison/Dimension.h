@@ -3,7 +3,7 @@
 #define BPMP_TRACKER_DIMENSION_H
 
 // Horizon length
-const int N  = 4;
+const int N  = 20;
 
 // Baseline에서 쓰는 “결정론적” tracker state dimension (x,y,theta)
 // const int Nx = 3;

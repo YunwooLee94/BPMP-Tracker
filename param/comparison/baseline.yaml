@@ -1,4 +1,4 @@
-time_step : 0.5
+time_step : 0.05
 # robot kinematic limits
 v0    : 0.0   # 초기 v (ROS에서 안 주면 param으로 둠)
 v_max : 1.0
@@ -8,8 +8,8 @@ a_max :  1.0
 
 # FOV params (annular sector)
 fov_angle : 1.7453292519943295  # 100 degrees in radians
-r_min: 0.5
-r_max: 1.5
+r_min: 1.2
+r_max: 1.8
 
 # obstacle
 obs_radius : 0.25
@@ -36,7 +36,7 @@ d_max : 2.0
 shrink : 0.2     # <1
 expand : 5     # >1
 rho_reject : 0.1
-rho_expand : 0.1
+rho_expand : 0.5
 
 # termination
 max_inner : 100
@@ -48,4 +48,4 @@ tau_f    : 1e-4
 grad_delta : 1e-6
 
 # DEBUG
-verbose : false
+verbose : true

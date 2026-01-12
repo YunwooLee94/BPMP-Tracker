@@ -22,8 +22,10 @@ class simulator:
             self.robot_state[0] += v * np.cos(theta) * dt
             self.robot_state[1] += v * np.sin(theta) * dt
         else:
-            self.robot_state[0] += (v / w) * (np.sin(theta + w * dt) - np.sin(theta))
-            self.robot_state[1] += (v / w) * (-np.cos(theta + w * dt) + np.cos(theta))
+            # self.robot_state[0] += (v / w) * (np.sin(theta + w * dt) - np.sin(theta))
+            # self.robot_state[1] += (v / w) * (-np.cos(theta + w * dt) + np.cos(theta))
+            self.robot_state[0] += v * np.cos(theta) * dt
+            self.robot_state[1] += v * np.sin(theta) * dt
         self.robot_state[2] += w * dt
         # self.robot_state[3] = v
 
@@ -136,7 +138,7 @@ if __name__ == "__main__":
     
     simul = simulator(
         init_robot_state=[0.0, 0.0, 0, 0.0],
-        init_target_state=[3.0, 0.0],
+        init_target_state=[1.0, 0.0],
         # init_obstacle_states=obstacles,
         DT=SIM_DT
     )

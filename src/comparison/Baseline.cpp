@@ -75,7 +75,7 @@ bpmp::Baseline::Baseline(): nh_("~") {
 
 void bpmp::Baseline::Run() {
     cout << "Baseline node started." << endl;
-    ros::Rate loop_rate(50.0);
+    ros::Rate loop_rate(20.0);
     while(ros::ok()){
         if(is_info_received()){
             MakeControl();
@@ -190,7 +190,8 @@ void bpmp::Baseline::MakeControl() {
         xk(0) += v * cos(theta) * param_.time_step;
         xk(1) += v * sin(theta) * param_.time_step;
         xk(2) += w * param_.time_step;
-        xk(3) = std::min(std::max(xk(3) + a * param_.time_step, -param_.v_max), param_.v_max);
+        // xk(3) = std::min(std::max(xk(3) + a * param_.time_step, -param_.v_max), param_.v_max);
+        xk(3) += a * param_.time_step;
         // add to marker
         geometry_msgs::Point p;
         p.x = xk(0);
@@ -439,26 +440,48 @@ void bpmp::Baseline::TrackerStateCallback(const nav_msgs::Odometry::ConstPtr &ms
     fov_marker.color.b = 0.0;
     double angle_left = current_tracker_state_.theta + param_.fov_angle / 2.0;
     double angle_right = current_tracker_state_.theta - param_.fov_angle / 2.0;
-    geometry_msgs::Point p_start;
-    p_start.x = current_tracker_state_.px;
-    p_start.y = current_tracker_state_.py;
-    p_start.z = 1.0;
-    geometry_msgs::Point p_left;
-    p_left.x = current_tracker_state_.px + param_.r_max * cos(angle_left);
-    p_left.y = current_tracker_state_.py + param_.r_max * sin(angle_left);
-    p_left.z = 1.0;
-    geometry_msgs::Point p_right;
-    p_right.x = current_tracker_state_.px + param_.r_max * cos(angle_right);
-    p_right.y = current_tracker_state_.py + param_.r_max * sin(angle_right);
-    p_right.z = 1.0;
-    geometry_msgs::Point p_end;
-    p_end.x = current_tracker_state_.px;
-    p_end.y = current_tracker_state_.py;
-    p_end.z = 1.0;
-    fov_marker.points.push_back(p_start);
-    fov_marker.points.push_back(p_left);
-    fov_marker.points.push_back(p_right);
-    fov_marker.points.push_back(p_end);
+    for (int i = 0; i < 10; i++) {
+        double angle = angle_right + i * (angle_left - angle_right) / 9.0;
+        geometry_msgs::Point p;
+        p.x = current_tracker_state_.px + param_.r_max * cos(angle);
+        p.y = current_tracker_state_.py + param_.r_max * sin(angle);
+        p.z = 1.0;
+        fov_marker.points.push_back(p);
+    }
+    for (int i = 9; i >= 0; i--) {
+        double angle = angle_right + i * (angle_left - angle_right) / 9.0;
+        geometry_msgs::Point p;
+        p.x = current_tracker_state_.px + param_.r_min * cos(angle);
+        p.y = current_tracker_state_.py + param_.r_min * sin(angle);
+        p.z = 1.0;
+        fov_marker.points.push_back(p);
+    }
+    geometry_msgs::Point p;
+    p.x = current_tracker_state_.px + param_.r_max * cos(angle_right);
+    p.y = current_tracker_state_.py + param_.r_max * sin(angle_right);
+    p.z = 1.0;
+    fov_marker.points.push_back(p);
+
+    // geometry_msgs::Point p_start;
+    // p_start.x = current_tracker_state_.px;
+    // p_start.y = current_tracker_state_.py;
+    // p_start.z = 1.0;
+    // geometry_msgs::Point p_left;
+    // p_left.x = current_tracker_state_.px + param_.r_max * cos(angle_left);
+    // p_left.y = current_tracker_state_.py + param_.r_max * sin(angle_left);
+    // p_left.z = 1.0;
+    // geometry_msgs::Point p_right;
+    // p_right.x = current_tracker_state_.px + param_.r_max * cos(angle_right);
+    // p_right.y = current_tracker_state_.py + param_.r_max * sin(angle_right);
+    // p_right.z = 1.0;
+    // geometry_msgs::Point p_end;
+    // p_end.x = current_tracker_state_.px;
+    // p_end.y = current_tracker_state_.py;
+    // p_end.z = 1.0;
+    // fov_marker.points.push_back(p_start);
+    // fov_marker.points.push_back(p_left);
+    // fov_marker.points.push_back(p_right);
+    // fov_marker.points.push_back(p_end);
     fov_sector_marker_publisher_.publish(fov_marker);
 }
 

@@ -429,50 +429,50 @@ if __name__ == "__main__":
 
 
 
-    # import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
 
-    # xx, yy = np.meshgrid(np.linspace(-5, 10, 151), np.linspace(-5, 10, 151))
-    # zz = np.stack([xx, yy], axis=-1)
+    xx, yy = np.meshgrid(np.linspace(-5, 10, 151), np.linspace(-5, 10, 151))
+    zz = np.stack([xx, yy], axis=-1)
 
-    # prob_map = np.zeros(xx.shape)
-    # sd_value_map = np.zeros(xx.shape)
-    # for i in range(xx.shape[0]):
-    #     for j in range(xx.shape[1]):
-    #         mu_t = np.array([xx[i, j], yy[i, j]])
-    #         prob_map[i, j] = gamma_tf_FOV(
-    #             mu_t,
-    #             Sigma_t,
-    #             mu_r,
-    #             Sigma_r,
-    #             r_min,
-    #             r_max,
-    #             fov_angle,
-    #         )
-    #         sd_value_map[i, j] = sd_annular_sector_fov(
-    #             mu_t,
-    #             sector_origin=mu_r[0:2],
-    #             sector_dir=mu_r[2],
-    #             r_min=r_min,
-    #             r_max=r_max,
-    #             fov_angle=fov_angle,
-    #         )
-    # plt.figure()
+    prob_map = np.zeros(xx.shape)
+    sd_value_map = np.zeros(xx.shape)
+    for i in range(xx.shape[0]):
+        for j in range(xx.shape[1]):
+            mu_t = np.array([xx[i, j], yy[i, j]])
+            prob_map[i, j] = gamma_tf_FOV(
+                mu_t,
+                Sigma_t,
+                mu_r,
+                Sigma_r,
+                r_min,
+                r_max,
+                fov_angle,
+            )
+            sd_value_map[i, j] = sd_annular_sector_fov(
+                mu_t,
+                sector_origin=mu_r[0:2],
+                sector_dir=mu_r[2],
+                r_min=r_min,
+                r_max=r_max,
+                fov_angle=fov_angle,
+            )
+    plt.figure()
 
-    # # plt.contourf(xx, yy, sd_value_map, levels=200, cmap="RdBu_r")
-    # # plt.colorbar(label="Signed Distance")
-    # # plt.contour(xx, yy, sd_value_map, levels=[0.0], colors="k", linewidths=2)
-    # plt.contour(xx, yy, prob_map, levels=[0.5], colors="g", linewidths=2)
-    # plt.contour(xx, yy, prob_map, levels=[0.8], colors="r", linewidths=2)
-    # plt.contour(xx, yy, prob_map, levels=[0.9], colors="r", linewidths=2)
-    # plt.contour(xx, yy, prob_map, levels=[0.7], colors="r", linewidths=2)
-    # plt.contourf(xx, yy, prob_map, levels=50, cmap='viridis')
-    # plt.plot(mu_r[0], mu_r[1], "ro", label="Robot", markersize=8)
-    # plt.plot(mu_t_[0], mu_t_[1], "bx", label="Target Mean", markersize=8)
-    # plt.colorbar(label='Probability of being in FOV')
-    # plt.xlabel('X position')
-    # plt.ylabel('Y position')
-    # plt.title('Probability Map of Target in Robot FOV')
-    # plt.show()
+    # plt.contourf(xx, yy, sd_value_map, levels=200, cmap="RdBu_r")
+    # plt.colorbar(label="Signed Distance")
+    # plt.contour(xx, yy, sd_value_map, levels=[0.0], colors="k", linewidths=2)
+    plt.contour(xx, yy, prob_map, levels=[0.5], colors="g", linewidths=2)
+    plt.contour(xx, yy, prob_map, levels=[0.8], colors="r", linewidths=2)
+    plt.contour(xx, yy, prob_map, levels=[0.9], colors="r", linewidths=2)
+    plt.contour(xx, yy, prob_map, levels=[0.7], colors="r", linewidths=2)
+    plt.contourf(xx, yy, prob_map, levels=50, cmap='viridis')
+    plt.plot(mu_r[0], mu_r[1], "ro", label="Robot", markersize=8)
+    plt.plot(mu_t_[0], mu_t_[1], "bx", label="Target Mean", markersize=8)
+    plt.colorbar(label='Probability of being in FOV')
+    plt.xlabel('X position')
+    plt.ylabel('Y position')
+    plt.title('Probability Map of Target in Robot FOV')
+    plt.show()
 
     # #################################################################################
 

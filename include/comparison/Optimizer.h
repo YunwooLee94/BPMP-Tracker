@@ -81,11 +81,11 @@ inline double clip(double x, double lo, double hi) {
 
 inline double phi_from_sd(double sd_value, double var_proj, bool sense_leq) {
     // sd_lin ~ N(sd_value, var_proj)
-    if (var_proj <= 1e-12) {
-        if (sense_leq) return (sd_value <= 0.0) ? 1.0 : 0.0;
-        else           return (sd_value >= 0.0) ? 1.0 : 0.0;
-    }
-    const double z = sd_value / (std::sqrt(var_proj) * std::sqrt(2.0));
+    // if (var_proj <= 1e-12) {
+    //     if (sense_leq) return (sd_value <= 0.0) ? 1.0 : 0.0;
+    //     else           return (sd_value >= 0.0) ? 1.0 : 0.0;
+    // }
+    const double z = sd_value / (std::sqrt(var_proj) * std::sqrt(2.0) + 1e-12);
     const double p_leq = 0.5 * (1.0 - std::erf(z)); // Pr(sd<=0)
     return sense_leq ? p_leq : (1.0 - p_leq);
 }
@@ -431,7 +431,8 @@ inline BeliefR robot_step(const BeliefR& b_r,
     out.mean(0) = x + v * std::cos(th) * p.time_step;
     out.mean(1) = y + v * std::sin(th) * p.time_step;
     out.mean(2) = th + w * p.time_step;
-    out.mean(3) = clip(v + a * p.time_step, -p.v_max, p.v_max);
+    // out.mean(3) = clip(v + a * p.time_step, -p.v_max, p.v_max);
+    out.mean(3) = v + a * p.time_step;
 
     Eigen::Matrix<double, Nx_r, Nx_r> A = Eigen::Matrix<double, Nx_r, Nx_r>::Identity();
     A(0,2) = -v * std::sin(th) * p.time_step;
@@ -616,7 +617,7 @@ inline void solve_trust_region_inf(const Eigen::Matrix<double, N, Nu>& u_ref,
     }
 
     // trust region in normalized space
-    d = clip(d, p.d_min, p.d_max);
+    // d = clip(d, p.d_min, p.d_max);
 
     Eigen::Matrix<double, N, Nu> ustar_n = uref_n;
 
