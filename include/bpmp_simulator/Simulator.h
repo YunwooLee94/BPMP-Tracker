@@ -96,6 +96,7 @@ namespace bpmp{
         vector<State> current_obstacle_state_list_;
         string initial_state_file_name_;
         string object_history_file_name_;
+        string object_history_file_path_name_;
         string obstacle_configuration_file_name_;
 
         void ReadInitialTrackerStateList();

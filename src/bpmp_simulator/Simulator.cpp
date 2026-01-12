@@ -22,17 +22,31 @@ void bpmp::Simulator::Run() {
         double t_sim;
         int test_cnt = 1; // For same target
         int scenario_count = 0;
+        int accumulated_success_count = 0;
         int success_count = 0;
         int episode_count = 0;
+        int object_file_count = 0;
+        int object_file_number = 3;
         bool fail_flag_target = false;
         bool fail_flag_obstacle = false;
         bool fail_flag_fov = false;
         bool error_flag = false;
         while(ros::ok()){
-            if(test_cnt>total_test_number_){
-                cout <<"TOTAL SCENARIO: "<<total_test_number_<< " SCENARIO CNT: "
-                     << scenario_count << ", SUCCESS CNT: " << success_count << endl;
+            if(object_file_count==object_file_number){
+            	accumulated_success_count += success_count;
+            	cout <<"TOTAL SCENARIO: "<<object_file_number*total_test_number_<< " SCENARIO CNT: "
+                     << object_file_count*total_test_number_+scenario_count << ", SUCCESS CNT: " << accumulated_success_count << endl;
                 break;
+            }
+            if(test_cnt>total_test_number_){
+                accumulated_success_count += success_count;
+                cout <<"UNTIL "<<object_file_count+1<<"-th Scenario: " <<"TOTAL SCENARIO: "<<object_file_number*total_test_number_<< " SUB SCENARIO CNT: "
+                     << object_file_count*total_test_number_+scenario_count << " SUB SUCCESS CNT: " << accumulated_success_count << endl;
+                test_cnt = 1;
+                scenario_count = 0;
+                success_count = 0;
+                object_history_file_name_ = object_history_file_path_name_+"/gar_"+std::to_string(++object_file_count)+".csv";
+                ReadObjectTrajectory();
             }
             t_sim = ros::Time::now().toSec() - t0;
             if (t_sim > object_history_list_[0].t.back()) {
@@ -55,8 +69,8 @@ void bpmp::Simulator::Run() {
                     if(fail_flag_fov)
                         ROS_WARN("ROBOT FAILS TO KEEP TARGET WITHIN FOV");
                 }
-                cout <<"TOTAL SCENARIO: "<<total_test_number_<< " SCENARIO CNT: "
-                     << scenario_count << ", SUCCESS CNT: " << success_count << endl;
+                cout <<"PROCESS TOTAL SCENARIO: "<<total_test_number_<< " PROCCESS SCENARIO CNT: "
+                     << scenario_count << " PROCESS SUCCESS CNT: " << success_count << endl;
 
                 fail_flag_obstacle = false;
                 fail_flag_target = false;
@@ -162,6 +176,7 @@ bpmp::Simulator::Simulator() : nh_("~") {
     object_number_ = (int) object_idx_list_.size(); // obstacles + target
     nh_.param<string>("initial_state_file_name", initial_state_file_name_, "");
     nh_.param<string>("object_history_file_name", object_history_file_name_, "");
+    nh_.param<string>("object_history_file_path_name", object_history_file_path_name_, "");
     // unstructured file name
     nh_.param<string>("obstacle_configuration_file_name", obstacle_configuration_file_name_, "");
     nh_.param<int>("moving_obstacle_number", moving_obstacle_number_, 0);
@@ -320,8 +335,9 @@ bpmp::Simulator::Simulator() : nh_("~") {
 
 void bpmp::Simulator::ReadObjectTrajectory() {
     ifstream object_trajectory_file;
+    object_history_file_name_ = object_history_file_path_name_+"/gar_1"+".csv";
     object_trajectory_file.open(object_history_file_name_.c_str());
-    object_history_list_.clear();
+    object_history_list_.clear();	
     int num_read_unit = 12;
     string line, word;
     vector<string> row;

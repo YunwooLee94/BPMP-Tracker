@@ -76,7 +76,7 @@ bpmp::Baseline::Baseline(): nh_("~") {
 
 void bpmp::Baseline::Run() {
     cout << "Baseline node started." << endl;
-    ros::Rate loop_rate(50.0);
+    ros::Rate loop_rate(1.0/param_.time_step);
     while(ros::ok()){
         if(is_info_received()){
             MakeControl();
@@ -120,6 +120,7 @@ void bpmp::Baseline::MakeControl() {
     }
 
     // build problem
+    //auto t_start = std::chrono::steady_clock::now();
     std::shared_ptr<bpmp::Problem> prob =
         std::make_shared<bpmp::Problem>(current_target_state_,
                                         current_obstacle_state_list_,
@@ -137,6 +138,9 @@ void bpmp::Baseline::MakeControl() {
     Optimizer<N,Nu> optimizer(*prob, uN_new, param_.time_step, param_);
     optimizer.Solve();
     const auto& u_sol = optimizer.solution();
+    //auto t_end = std::chrono::steady_clock::now();
+    //double elapsed_sec = std::chrono::duration<double>(t_end - t_start).count();
+    //std:: cout<<"ELAPSED TIME: "<<elapsed_sec<<std::endl;
 
     // save for next extrapolation
     u_prev = u_sol;
