@@ -867,7 +867,9 @@ public:
         }
         float toc = static_cast<float>(std::clock());
         float elapsed = (toc - tic) / CLOCKS_PER_SEC;
-        std::cout << "[bpmp::Optimizer] Iterations: outer = " << iter_outer << ", inner = " << iter_inner << " Solve() time: " << elapsed << " sec" << std::endl;
+        if (param_.verbose){
+            std::cout << "[bpmp::Optimizer] Iterations: outer = " << iter_outer << ", inner = " << iter_inner << " Solve() time: " << elapsed << " sec" << std::endl;
+        }   
     }
 
     const Collection<VectorU, N_>& solution() const { return u_sol_; }

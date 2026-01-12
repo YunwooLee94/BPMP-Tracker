@@ -8,8 +8,8 @@ a_max :  1.0
 
 # FOV params (annular sector)
 fov_angle : 1.7453292519943295  # 100 degrees in radians
-r_min: 0.3
-r_max: 1.7
+r_min: 0.7
+r_max: 1.3
 
 # obstacle
 obs_radius : 0.5

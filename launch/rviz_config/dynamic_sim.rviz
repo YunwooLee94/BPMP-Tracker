@@ -9,9 +9,7 @@ Panels:
         - /ActiveObstacle1
         - /MarkerArray3
         - /Marker3
-        - /Marker3/Status1
         - /Marker4
-        - /Marker4/Status1
       Splitter Ratio: 0.3984000086784363
     Tree Height: 616
   - Class: rviz/Selection
@@ -476,10 +474,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 43.313453674316406
+      Scale: 47.81250762939453
       Target Frame: <Fixed Frame>
-      X: 0.15163542330265045
-      Y: 4.217177867889404
+      X: 0.34659695625305176
+      Y: 0.18599849939346313
     Saved: ~
 Window Geometry:
   Displays:
