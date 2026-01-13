@@ -10,7 +10,7 @@ from matplotlib.patches import Circle
 
 DT = 0.5  # time step duration
 OBS_RADIUS = 0.25  # obstacle radius for collision checking
-
+ROBOT_RADIUS = 0.25  # robot radius for collision checking
 @dataclass
 class BeliefState():
     mean: np.ndarray
@@ -23,7 +23,7 @@ class FOVParams():
     r_min: float
     r_max: float
 
-def robot_step(b_r: BeliefState, control: np.ndarray, process_noise: np.ndarray, v_max=1.0):
+def robot_step(b_r: BeliefState, control: np.ndarray, process_noise: np.ndarray, v_max=3.0):
     """
     control: shape (2,) -> [omega, acc]
     """
@@ -46,6 +46,9 @@ def robot_step(b_r: BeliefState, control: np.ndarray, process_noise: np.ndarray,
         [0, 0, 0, 1]
     ])
     covariance_new = A_mat @ b_r.covariance @ A_mat.T + process_noise  # Simple linearized covariance update
+    
+    covariance_new = (covariance_new + covariance_new.T) / 2.0  # ensure symmetry
+        
     return BeliefState(mean_new, covariance_new, dim=4)
 
 def target_step(b_t: BeliefState, control_target: np.ndarray, process_noise: np.ndarray, sensor_noise: np.ndarray,
@@ -134,8 +137,8 @@ def get_J_m(b_r0, b_t0, u_bar, robot_process_noise,
             gamma_ro = 0.0
         for obs in obstacle_states[k]:
             obs_origin = np.array([obs[0], obs[1]])
-            gamma_ro, _, _ = gamma_ro_collision(b_r_list[k+1].mean, b_r_list[k+1].covariance, obs_origin, OBS_RADIUS)
-        gamma_ro_list.append(gamma_ro)
+            gamma_ro, _, _ = gamma_ro_collision(b_r_list[k+1].mean, b_r_list[k+1].covariance, obs_origin, OBS_RADIUS + ROBOT_RADIUS)
+            gamma_ro_list.append(gamma_ro)
     
     # get J
     if function_J == "1":
@@ -242,6 +245,51 @@ def solve_convex_subproblem(J_grad, J_m_base, u_ref, trust_radius, trust_norm, w
 
     return u_star, predicted_decrease
 
+
+def solve_convex_subproblem_inf(J_grad, J_m_base, u_ref, trust_radius, trust_norm, w_max, a_max, a_min):
+    """
+    Solve the convex subproblem with trust region constraint.
+    J_grad: shape (N, nu)
+    u_ref: shape (N, nu)
+    trust_radius: scalar
+    trust_norm: "inf"
+    eta: penalty parameter for merit function
+    ------------------------------
+    Returns:
+    u_star: shape (N, nu)
+    predicted_decrease: scalar
+    """
+    N, nu = u_ref.shape
+    # minimize: J_grad.flatten() @ (u - u_ref).flatten()
+    # subject to: ||u - u_ref||_trust_norm <= trust_radius
+    # u = cp.Variable((N, nu))
+    # normalize the min/max values to improve numerical stability
+    u_normlized = np.zeros((N, nu))
+    w_scale = w_max * 2
+    a_scale = a_max - a_min
+    J_grad_normalized = J_grad.copy()
+    J_grad_normalized[:, 0] = J_grad_normalized[:, 0] * w_scale
+    J_grad_normalized[:, 1] = J_grad_normalized[:, 1] * a_scale
+    u_ref_normlized = u_ref.copy()
+    u_ref_normlized[:, 0] = (u_ref[:, 0] + w_max) / w_scale  # normalize to [0, 1]
+    u_ref_normlized[:, 1] = (u_ref[:, 1] - a_min) / a_scale  # normalize to [0, 1]
+
+    for k in range(N):
+        for j in range(nu):
+            if J_grad_normalized[k, j] > 0:
+                u_normlized[k, j] = max(u_ref_normlized[k, j] - trust_radius, 0.0)
+            else:
+                u_normlized[k, j] = min(u_ref_normlized[k, j] + trust_radius, 1.0)
+    
+
+    u_star = u_normlized.copy()
+    # denormalize
+    u_star[:, 0] = u_star[:, 0] * w_scale - w_max
+    u_star[:, 1] = u_star[:, 1] * a_scale + a_min
+    predicted_decrease = J_m_base + J_grad.flatten() @ (u_star.flatten() - u_ref.flatten())
+
+    return u_star, predicted_decrease
+
 # Algorithm 2 : with trust region
 def SCP(
     # problem data
@@ -252,20 +300,20 @@ def SCP(
     # initial guess
     u_init,                   # shape (N, nu)
     # hyperparams
-    robot_process_noise=np.eye(4)*0.05,
-    target_process_noise=np.eye(2)*0.1,
-    target_sensor_noise=np.eye(2)*0.05,
+    robot_process_noise=np.diag([4, 4, 0.4, 0.4])*1e-3,
+    target_process_noise=np.eye(2)*0.04,
+    target_sensor_noise=np.diag([0.3, 0.05]),
     # SCP params
-    eta0=0.1, beta=10.0, eta_max=1e3,   # penalty continuation (outer loop)
-    d0=0.25, d_min=1e-2, d_max=2.0,      # trust-region radius
-    shrink=0.2, expand=5,             # trust-region update factors
-    rho_reject=0.1, rho_expand=0.1,    # acceptance thresholds
-    tau_conv=1e-5, tau_f =1e-4, tau_p=1e-2,        # convergence thresholds
+    eta0=0.1, beta=3.0, eta_max=1e3,   # penalty continuation (outer loop)
+    d0=0.25, d_min=1e-4, d_max=2.0,      # trust-region radius
+    shrink=0.5, expand=2,             # trust-region update factors
+    rho_reject=0.2, rho_expand=0.8,    # acceptance thresholds
+    tau_conv=1e-3, tau_f =1e-4, tau_p=1e-2,        # convergence thresholds
     max_inner=100, max_outer=10,
     trust_norm="inf",                   # "inf" or "l2"
     function_J="2",                     # "1" or "2"
-    gamma_collision_threshold=0.2,       # collision threshold for inequality constraints
-    w_max=np.deg2rad(60),               # max angular velocity
+    gamma_collision_threshold=0.6,       # collision threshold for inequality constraints
+    w_max=np.deg2rad(90),               # max angular velocity
     a_max=1.0,                         # max acceleration
     a_min=-1.0,                        # min acceleration
 ):
@@ -275,7 +323,9 @@ def SCP(
       - inner loop: SCP iteration
       - line 12: trust region constraint 추가한 convex subproblem(QP) solve
     """
-
+    robot_process_noise = robot_process_noise * DT
+    target_process_noise = target_process_noise * DT
+    
     u_bar = u_init.copy()   # current nominal control (u^{(n)})
     N, nu = u_bar.shape
     eta = eta0
@@ -300,15 +350,21 @@ def SCP(
         # inner SCP loop
         inner_iter = 0
         d = d0
+
+        inner_success = False
+        inner_fail_reason = None
+        best_violation = np.inf
+        best_Jm = np.inf
+
         while inner_iter < max_inner:
             # visualization
-            visualization_SCP(u_bar, obstacle_states, b_r0, b_t0,
-                robot_process_noise,
-                target_process_noise,
-                target_sensor_noise,
-                target_control_predicted,
-                fov,
-            )
+            # visualization_SCP(u_bar, obstacle_states, b_r0, b_t0,
+            #     robot_process_noise,
+            #     target_process_noise,
+            #     target_sensor_noise,
+            #     target_control_predicted,
+            #     fov,
+            # )
             try:
                 
                 inner_iter += 1
@@ -327,7 +383,7 @@ def SCP(
                 
                 # (line 12) solve convex subproblem with TRUST REGION
                 #     trust region은 "추정해가 너무 멀리 튀지 않게" 하는 핵심 장치
-                u_star, J_tilt_star = solve_convex_subproblem(
+                u_star, J_tilt_star = solve_convex_subproblem_inf(
                     J_m_grad,
                     J_m_base,
                     u_ref=u_bar,
@@ -406,16 +462,19 @@ def SCP(
                 pass
 
             # visualization
-            visualization_SCP(u_bar, obstacle_states, b_r0, b_t0,
-                robot_process_noise,
-                target_process_noise,
-                target_sensor_noise,
-                target_control_predicted,
-                fov,
-            )
+            # visualization_SCP(u_bar, obstacle_states, b_r0, b_t0,
+            #     robot_process_noise,
+            #     target_process_noise,
+            #     target_sensor_noise,
+            #     target_control_predicted,
+            #     fov,
+            # )
         
         if constraint_values_star is not None and constraint_values_star <= tau_p:
             print("All constraints satisfied. Stopping outer loop.")
+            best_violation = constraint_values_star
+            best_Jm = Jm_star
+            best_u = u_star.copy()
             break
         else:
             print(f"Outer iter {outer_iter} completed. Constraint violation: {constraint_values_star:.6f}. Updating penalty eta and continuing.")
@@ -423,13 +482,13 @@ def SCP(
             eta *= beta
             # print(f"Outer iter {outer_iter} completed. Updated penalty eta = {eta:.4f}")
 
-    # visualization_SCP(u_bar, obstacle_states, b_r0, b_t0,
-    # robot_process_noise,
-    # target_process_noise,
-    # target_sensor_noise,
-    # target_control_predicted,
-    # fov,click_to_close=False
-    # )
+    visualization_SCP(u_bar, obstacle_states, b_r0, b_t0,
+    robot_process_noise,
+    target_process_noise,
+    target_sensor_noise,
+    target_control_predicted,
+    fov,click_to_close=False
+    )
 
     return u_bar
 
@@ -472,6 +531,38 @@ def visualization_SCP(u_cur, obstacle_states, b_r0, b_t0,
     plt.plot(robot_x, robot_y, 'b-o', label='Robot Path')
     plt.plot(target_x, target_y, 'r-s', label='Target Path')
 
+    # plot covariance ellipses
+    for b_r in b_r_list:
+        cov = b_r.covariance[0:2, 0:2]
+        eigvals, eigvecs = np.linalg.eig(cov)
+        angle = np.arctan2(eigvecs[1, 0], eigvecs[0, 0])
+        angle = np.degrees(angle)
+        ellipse = plt.matplotlib.patches.Ellipse(
+            (b_r.mean[0], b_r.mean[1]),
+            width=2 * np.sqrt(5.991 * eigvals[0]),  # 95% confidence interval
+            height=2 * np.sqrt(5.991 * eigvals[1]),
+            angle=angle,
+            edgecolor='b',
+            facecolor='none',
+            alpha=0.3
+        )
+        plt.gca().add_patch(ellipse)
+    for b_t in b_t_list:
+        cov = b_t.covariance[0:2, 0:2]
+        eigvals, eigvecs = np.linalg.eig(cov)
+        angle = np.arctan2(eigvecs[1, 0], eigvecs[0, 0])
+        angle = np.degrees(angle)
+        ellipse = plt.matplotlib.patches.Ellipse(
+            (b_t.mean[0], b_t.mean[1]),
+            width=2 * np.sqrt(5.991 * eigvals[0]),  # 95% confidence interval
+            height=2 * np.sqrt(5.991 * eigvals[1]),
+            angle=angle,
+            edgecolor='r',
+            facecolor='none',
+            alpha=0.3
+        )
+        plt.gca().add_patch(ellipse)
+
     if len(obstacle_states[0]) > 0:
         for obs_t0 in obstacle_states[0]:
             plt.plot(obs_t0[0], obs_t0[1], 'kx', markersize=10, label='Obstacle')
@@ -510,7 +601,7 @@ def visualization_SCP(u_cur, obstacle_states, b_r0, b_t0,
     plt.axis('equal')
     plt.grid()
     if click_to_close:
-        plt.waitforbuttonpress(0.01)
+        plt.waitforbuttonpress(0)
     else:
         plt.show()
 
@@ -519,28 +610,28 @@ if __name__ == "__main__":
     test_obstacles = ObjectStateList()
     obs1 = ObjectState()
     obs1.px = 1.0
-    obs1.py = 0.3
+    obs1.py = 0.5
     obs1.pz = 0.0
     obs1.vx = 0.0
     obs1.vy = 0.0
     obs1.vz = 0.0
     test_obstacles.object_state_list.append(obs1)
 
-    # obs1 = ObjectState()
-    # obs1.px = 1.0
-    # obs1.py = -0.5
-    # obs1.pz = 0.0
-    # obs1.vx = 0.0
-    # obs1.vy = 0.0
-    # obs1.vz = 0.0
-    # test_obstacles.object_state_list.append(obs1)
+    obs1 = ObjectState()
+    obs1.px = 1.0
+    obs1.py = -0.6
+    obs1.pz = 0.0
+    obs1.vx = 0.0
+    obs1.vy = 0.0
+    obs1.vz = 0.0
+    test_obstacles.object_state_list.append(obs1)
 
-    test_fov_params = FOVParams(fov=np.deg2rad(100), r_min=0.2, r_max=1.8)
-    b_r0 = BeliefState(mean=np.array([0.0, 0.000, np.deg2rad(30), 1.0]), covariance=np.eye(4)*0.001, dim=4)
-    b_t0 = BeliefState(mean=np.array([0.5, 0.0]), covariance=np.eye(2)*0.005, dim=2)
+    test_fov_params = FOVParams(fov=np.deg2rad(100), r_min=0.7, r_max=1.3)
+    b_r0 = BeliefState(mean=np.array([0.0, 0.000, np.deg2rad(30), 0.8]), covariance=np.eye(4)*0.001, dim=4)
+    b_t0 = BeliefState(mean=np.array([1, 0.0]), covariance=np.eye(2)*0.001, dim=2)
 
-    DT = 0.5
-    u_init = np.zeros((4, 2))
+    DT = 0.2
+    u_init = np.zeros((10, 2))
     # u_init[:, 0] = -np.deg2rad(90)  # initial angular velocity
     target_vel = [0.5, 0.0]
     w_max = np.deg2rad(90)  # max angular velocity

@@ -97,18 +97,19 @@ bool bpmp::Baseline::is_info_received() {
 
 void bpmp::Baseline::MakeControl() {
     // ---- warm start (paper: extrapolate previous solution) ----
-    static bool has_prev = false;
+    // static bool has_prev = false;
     // static double prev_time = 0.0;
-    static Collection<Eigen::Matrix<double,Nu,1>,N> u_prev;
+    // static Collection<Eigen::Matrix<double,Nu,1>,N> u_prev;
     // static double prev_control_v = 0.0;
 
     Collection<Eigen::Matrix<double,Nu,1>,N> u0;
-    if(!has_prev){
+    // if(!has_prev){
         for(int k=0;k<N;k++){
             u0[k] = (Eigen::Matrix<double,Nu,1>() << 0.0, 0.0).finished();
         }
         // prev_time = ros::Time::now().toSec();
-    }else{
+    // }else{
+        ;
         // ver1 : shift left by one, repeat last
         // for(int k=0;k<N-1;k++){
         //     u0[k] = u_prev[k+1];
@@ -117,7 +118,7 @@ void bpmp::Baseline::MakeControl() {
 
         // ver2 : use previous control as initial guess without shifting
         // u0 = u_prev;
-    }
+    // }
 
     // build problem
     //auto t_start = std::chrono::steady_clock::now();
@@ -132,10 +133,10 @@ void bpmp::Baseline::MakeControl() {
               current_tracker_state_.py,
               current_tracker_state_.theta).finished();
 
-    Collection<Eigen::Matrix<double,Nu,1>,N> uN_new = u0;
+    // Collection<Eigen::Matrix<double,Nu,1>,N> uN_new = u0;
 
     // solve
-    Optimizer<N,Nu> optimizer(*prob, uN_new, param_.time_step, param_);
+    Optimizer optimizer(*prob, u0, param_);
     optimizer.Solve();
     const auto& u_sol = optimizer.solution();
     //auto t_end = std::chrono::steady_clock::now();
@@ -143,8 +144,8 @@ void bpmp::Baseline::MakeControl() {
     //std:: cout<<"ELAPSED TIME: "<<elapsed_sec<<std::endl;
 
     // save for next extrapolation
-    u_prev = u_sol;
-    has_prev = true;
+    // u_prev = u_sol;
+    // has_prev = true;
 
     // ---- publish first control ----
     bpmp_tracker::UnicycleInput cmd;
