@@ -469,6 +469,7 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
     tracker_vis_.pose.pose.orientation.y = 0.0;
     tracker_vis_.pose.pose.orientation.z = sin(0.5*current_unicycle_state_.theta);
     tracker_vis_.pose.pose.orientation.w = cos(0.5*current_unicycle_state_.theta);
+    tracker_vis_.header.stamp = ros::Time::now();
     // Tracker tf Publish
     tf::Transform transform;
     transform.setOrigin(tf::Vector3(tracker_vis_.pose.pose.position.x,tracker_vis_.pose.pose.position.y,tracker_vis_.pose.pose.position.z));
@@ -502,6 +503,8 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
         obstacle_path_.markers[i].points.push_back(obstacle_pts);
         */
     }
+    obstacle_state_list_msg_.header.stamp = ros::Time::now();
+    //obstacle_state_list_msg_.header.
     tracker_state_msg_.px = current_unicycle_state_.px;
     tracker_state_msg_.py = current_unicycle_state_.py;
     tracker_state_msg_.pz = current_unicycle_state_.pz;
