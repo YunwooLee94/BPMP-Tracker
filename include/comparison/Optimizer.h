@@ -710,8 +710,8 @@ public:
             obs_centers[k].clear();
             obs_centers[k].reserve(problem_->obstacle_state_list().size());
             for(const auto& o : problem_->obstacle_state_list()){
-                obs_centers[k].emplace_back(o.px + o.vx * (k+1) * param_.time_step, 
-                                            o.py + o.vy * (k+1) * param_.time_step);
+                obs_centers[k].emplace_back(o.px + 0.0 * (k+1) * param_.time_step, 
+                                            o.py + 0.0 * (k+1) * param_.time_step);
             }
         }
         
