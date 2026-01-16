@@ -54,6 +54,7 @@ file(GLOB BPMP_TRACKER_SRC src/bpmp_tracker/Wrapper.cpp src/bpmp_tracker/Planner
 file(GLOB BPMP_COMPARISON_SRC src/comparison/*.cpp)
 file(GLOB BPMP_BASELINE_SRC src/comparison/Baseline.cpp)
 file(GLOB ELASTIC_TYPE_CVT_SRC src/comparison/ElasticTypeConverter.cpp)
+file(GLOB ELASTIC_TRACKER_SRC src/comparison/ElasticTracker.cpp)
 
 
 add_executable(bpmp_simulator exe/main_simulator.cpp ${BPMP_SIMULATOR_SRC} ${BPMP_UTILS_SRC})
@@ -76,6 +77,10 @@ target_link_libraries(baseline ${catkin_LIBRARIES} -lstdc++fs)
 
 add_executable(elastic_type_converter exe/main_elastic_type_converter.cpp ${ELASTIC_TYPE_CVT_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(elastic_type_converter ${catkin_LIBRARIES} -lstdc++fs)
+
+
+add_executable(elastic_tracker exe/main_elastic_tracker.cpp ${ELASTIC_TRACKER_SRC} ${BPMP_UTILS_SRC})
+target_link_libraries(elastic_tracker ${catkin_LIBRARIES} -lstdc++fs)
 
 
 add_dependencies(comparison_controller ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

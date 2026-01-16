@@ -16,6 +16,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <vector>
 namespace bpmp{
     typedef message_filters::sync_policies::ApproximateTime<bpmp_tracker::ObjectStateList, nav_msgs::Odometry> ObstacleTrackerSync;
     class ElasticTypeConverter{
@@ -25,8 +26,14 @@ namespace bpmp{
         message_filters::Synchronizer<bpmp::ObstacleTrackerSync> *sub_sync_;
         message_filters::Subscriber<bpmp_tracker::ObjectStateList> *sub_dynamic_obstacle_;
         message_filters::Subscriber<nav_msgs::Odometry> *sub_tracker_odometry_;
-
+        ros::Publisher pc_pub_;
         double sensing_range_;
+        double object_radius_;
+
+        const int num_theta_ = 10;
+        const int num_z_ = 20;
+        std::vector<double> theta_array_ ;
+        std::vector<double> z_array_;
     public:
         ElasticTypeConverter();
         ~ElasticTypeConverter();
