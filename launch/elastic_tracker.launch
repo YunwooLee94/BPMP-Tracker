@@ -11,7 +11,8 @@
         <param name="object_history_file_path_name" value="$(find bpmp_tracker)/world/analysis"/>
         <param name="initial_state_file_name" value="$(find bpmp_tracker)/world/analysis/initial_trajectory.txt"/>
     </node>
-
+    <node pkg="tf2_ros" type="static_transform_publisher" name="world_to_map"
+          args="0 0 0 0 0 0 world map" />
     <node pkg="bpmp_tracker" type="elastic_type_converter" name="elastic_type_converter" output="screen">
         <rosparam command="load" file="$(find bpmp_tracker)/param/comparison/elastic_type_converter.yaml"/>
     </node>

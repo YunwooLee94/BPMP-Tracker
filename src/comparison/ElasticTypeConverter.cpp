@@ -8,9 +8,13 @@ bpmp::ElasticTypeConverter::ElasticTypeConverter():nh_("~") {
     sub_tracker_odometry_ = new message_filters::Subscriber<nav_msgs::Odometry>(nh_,"/base_odom",1);
     sub_sync_ = new message_filters::Synchronizer<bpmp::ObstacleTrackerSync>(bpmp::ObstacleTrackerSync(10), *this->sub_dynamic_obstacle_, *this->sub_tracker_odometry_);
     sub_sync_->registerCallback(boost::bind(&ElasticTypeConverter::SyncCallback,this,_1,_2));
+    target_odom_sub_ = nh_.subscribe("/bpmp_simulator/target_state", 1,
+                                             &ElasticTypeConverter::TargetCallback, this);
+
     nh_.param<double>("sensing_range",sensing_range_,1.0);
     nh_.param<double>("object_radius",object_radius_,0.25);
     pc_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/obstacle_pointcloud",1);
+    target_odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/target_ekf_odom",1);
     for(int i =0;i<num_theta_;i++){
         theta_array_.push_back(M_PI*2.0/double(num_theta_)*double(i));
     }
@@ -65,4 +69,28 @@ bpmp::ElasticTypeConverter::~ElasticTypeConverter() {
     delete sub_sync_;
     delete sub_dynamic_obstacle_;
     delete sub_tracker_odometry_;
+}
+
+void bpmp::ElasticTypeConverter::TargetCallback(const bpmp_tracker::ObjectState &target_msg) {
+    nav_msgs::Odometry target_ekf_odom;
+    target_ekf_odom.header.frame_id = "map";
+    // Position
+    target_ekf_odom.pose.pose.position.x= target_msg.px;
+    target_ekf_odom.pose.pose.position.y= target_msg.py;
+    target_ekf_odom.pose.pose.position.z= 0.5;
+    // Orientation
+    target_ekf_odom.pose.pose.orientation.w = 1.0;
+    target_ekf_odom.pose.pose.orientation.x = 0.0;
+    target_ekf_odom.pose.pose.orientation.y = 0.0;
+    target_ekf_odom.pose.pose.orientation.z = 0.0;
+    // Velocity-linear
+    target_ekf_odom.twist.twist.linear.x = target_msg.vx;
+    target_ekf_odom.twist.twist.linear.y = target_msg.vy;
+    target_ekf_odom.twist.twist.linear.z = 0.0;
+    // Velocity-angular
+    target_ekf_odom.twist.twist.angular.x = 0.0;
+    target_ekf_odom.twist.twist.angular.y = 0.0;
+    target_ekf_odom.twist.twist.angular.z = 0.0;
+    // Publish
+    target_odom_pub_.publish(target_ekf_odom);
 }

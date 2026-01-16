@@ -26,7 +26,10 @@ namespace bpmp{
         message_filters::Synchronizer<bpmp::ObstacleTrackerSync> *sub_sync_;
         message_filters::Subscriber<bpmp_tracker::ObjectStateList> *sub_dynamic_obstacle_;
         message_filters::Subscriber<nav_msgs::Odometry> *sub_tracker_odometry_;
+        void TargetCallback(const bpmp_tracker::ObjectState  &target_msg);
         ros::Publisher pc_pub_;
+        ros::Publisher target_odom_pub_;
+        ros::Subscriber target_odom_sub_;
         double sensing_range_;
         double object_radius_;
 
