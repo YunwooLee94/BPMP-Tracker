@@ -19,6 +19,8 @@ bpmp::ElasticTracker::ElasticTracker():nh_("~") {
                                                     &ElasticTracker::ObstacleStateListCallback, this);
     cloud_.header.frame_id="map";
 
+    occ_grid_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/elastic_tracker/occ_grid",1);
+
 }
 
 void bpmp::ElasticTracker::Run() {
@@ -71,6 +73,12 @@ void bpmp::ElasticTracker::ObstacleStateListCallback(const sensor_msgs::PointClo
     }
     grid_map.inflate(int(param_.param_g.agent_size/param_.param_g.resolution));
     gridmapPtr_.reset(new mapping::OccGridMap(grid_map));
+    sensor_msgs::PointCloud2 occ_msg;
+    gridmapPtr_->occ2pc(occ_msg);
+    occ_msg.header.stamp = ros::Time::now();
+    occ_msg.header.frame_id = "map";
+    occ_grid_pub_.publish(occ_msg);
+//    std::cout<<"[ELASTIC TRACKER]: Got Obstacle PointCloud"<<std::endl;
 }
 
 bool bpmp::ElasticTracker::IsInfoReady() {

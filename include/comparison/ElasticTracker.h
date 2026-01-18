@@ -38,6 +38,7 @@ namespace bpmp{
         ros::Subscriber tracker_sub_;
         ros::Subscriber dynamic_obstacle_sub_;
         ros::Subscriber target_sub_;
+        ros::Publisher occ_grid_pub_;
         ElasticParam param_;
 
         void ObstacleStateListCallback(const sensor_msgs::PointCloud2 &msg);
