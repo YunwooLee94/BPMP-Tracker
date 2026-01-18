@@ -160,7 +160,7 @@ namespace mapping {
         pcd.height = 1;
         pcd.is_dense = true;
         pcl::toROSMsg(pcd, msg);
-        msg.header.frame_id = "world";
+        msg.header.frame_id = "map";
     }
 
     void OccGridMap::occ2pc(sensor_msgs::PointCloud2& msg, double floor, double ceil) {
@@ -185,7 +185,7 @@ namespace mapping {
         pcd.height = 1;
         pcd.is_dense = true;
         pcl::toROSMsg(pcd, msg);
-        msg.header.frame_id = "world";
+        msg.header.frame_id = "map";
     }
 
     void OccGridMap::inflate_once() {

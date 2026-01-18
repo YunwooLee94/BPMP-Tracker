@@ -23,6 +23,10 @@ find_package(catkin REQUIRED COMPONENTS
   message_filters
   geometry_msgs
   nav_msgs
+  traj_opt
+  # mapping
+  quadrotor_msgs
+  nodelet
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${DECOMP_UTIL_INCLUDE_DIRS})

@@ -1,5 +1,12 @@
 x_length: 7.0 # Map size, x: [-x_length, x_length]
 y_length: 7.0 # Map size, y: [-y_length, y_length]
-z_length: 2.0 # Map size, z: [-z_length, z_length]
+z_length: 1.0 # Map size, z: [-z_length, z_length]
 resolution: 0.05
 agent_size: 0.25
+tracking_dist: 3.0
+tolerance_d: 0.3
+tracking_dur: 3.0
+tracking_dt: 0.2
+prediction:
+  rho_a: 1.0
+  vmax: 3.0
