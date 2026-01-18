@@ -35,7 +35,8 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-add_message_files(FILES ControlInput.msg ControlInputList.msg ObjectState.msg ObjectStateList.msg PolyState.msg RobotState.msg UnicycleInput.msg UnicycleState.msg)
+add_message_files(FILES ControlInput.msg ControlInputList.msg ObjectState.msg ObjectStateList.msg PolyState.msg RobotState.msg UnicycleInput.msg UnicycleState.msg
+OccMap3d.msg PolyTraj.msg)
 generate_messages(DEPENDENCIES std_msgs)
 
 catkin_package(
@@ -54,7 +55,7 @@ file(GLOB BPMP_TRACKER_SRC src/bpmp_tracker/Wrapper.cpp src/bpmp_tracker/Planner
 file(GLOB BPMP_COMPARISON_SRC src/comparison/*.cpp)
 file(GLOB BPMP_BASELINE_SRC src/comparison/Baseline.cpp)
 file(GLOB ELASTIC_TYPE_CVT_SRC src/comparison/ElasticTypeConverter.cpp)
-file(GLOB ELASTIC_TRACKER_SRC src/comparison/ElasticTracker.cpp)
+file(GLOB ELASTIC_TRACKER_SRC src/comparison/ElasticTracker.cpp src/comparison/Mapping.cpp)
 
 
 add_executable(bpmp_simulator exe/main_simulator.cpp ${BPMP_SIMULATOR_SRC} ${BPMP_UTILS_SRC})

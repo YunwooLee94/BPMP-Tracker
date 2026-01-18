@@ -14,8 +14,23 @@
 #include <nav_msgs/Odometry.h>
 #include <bpmp_tracker/ObjectState.h>
 #include <bpmp_tracker/ObjectStateList.h>
+#include <comparison/Mapping.h>
 
 namespace bpmp{
+    struct ElasticGridParm{
+        double resolution;
+        double x_length;
+        double y_length;
+        double z_length;
+        double agent_size;
+    };
+    struct ElasticPlanningParam{
+
+    };
+    struct ElasticParam{
+        ElasticGridParm param_g;
+        ElasticPlanningParam param_p;
+    };
     class ElasticTracker{
     private:
         ros::NodeHandle nh_;
@@ -23,6 +38,7 @@ namespace bpmp{
         ros::Subscriber tracker_sub_;
         ros::Subscriber dynamic_obstacle_sub_;
         ros::Subscriber target_sub_;
+        ElasticParam param_;
 
         void ObstacleStateListCallback(const sensor_msgs::PointCloud2 &msg);
         void TrackerStateCallback(const nav_msgs::Odometry &msg);
@@ -36,6 +52,8 @@ namespace bpmp{
         bool is_target_info_received_{false};
         bool is_tracker_info_received_{false};
         bool is_pcl_info_received_{false};
+
+        std::shared_ptr<mapping::OccGridMap> gridmapPtr_;
 
         void Planning();
     public:

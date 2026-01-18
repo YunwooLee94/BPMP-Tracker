@@ -4,6 +4,13 @@
 #include <comparison/ElasticTracker.h>
 
 bpmp::ElasticTracker::ElasticTracker():nh_("~") {
+    nh_.param<double>("x_length",param_.param_g.x_length,1.0);
+    nh_.param<double>("y_length",param_.param_g.y_length,1.0);
+    nh_.param<double>("z_length",param_.param_g.z_length,1.0);
+    nh_.param<double>("resolution",param_.param_g.resolution,1.0);
+    nh_.param<double>("agent_size", param_.param_g.agent_size,0.25);
+
+
     tracker_sub_ = nh_.subscribe("/base_odom", 1,
                                               &ElasticTracker::TrackerStateCallback, this);
     target_sub_ = nh_.subscribe("/bpmp_simulator/target_state", 1,
@@ -55,7 +62,15 @@ void bpmp::ElasticTracker::ObstacleStateListCallback(const sensor_msgs::PointClo
     is_pcl_info_received_ = true;
     cloud_.points.clear();
     pcl::fromROSMsg(msg, cloud_);
-//    std::cout<<"[ELASTIC TRACKER]: Got Point-cloud"<<std::endl;
+    mapping::OccGridMap grid_map;
+    grid_map.setup(param_.param_g.resolution,Eigen::Vector3d(param_.param_g.x_length,
+                                                             param_.param_g.y_length,param_.param_g.z_length),10.0,true);
+    for (const auto& pt : cloud_) {
+        Eigen::Vector3d p(pt.x, pt.y, pt.z);
+        grid_map.setOcc(p);
+    }
+    grid_map.inflate(int(param_.param_g.agent_size/param_.param_g.resolution));
+    gridmapPtr_.reset(new mapping::OccGridMap(grid_map));
 }
 
 bool bpmp::ElasticTracker::IsInfoReady() {
