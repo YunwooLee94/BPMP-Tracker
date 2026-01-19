@@ -8,7 +8,7 @@ project(bpmp_tracker)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++17")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE")
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
 
 find_package(Eigen3  REQUIRED NO_MODULE)
 include_directories(${EIGEN3_INCLUDE_DIRS})
@@ -87,12 +87,16 @@ target_link_libraries(elastic_type_converter ${catkin_LIBRARIES} -lstdc++fs)
 add_executable(elastic_tracker exe/main_elastic_tracker.cpp ${ELASTIC_TRACKER_SRC} ${BPMP_UTILS_SRC})
 target_link_libraries(elastic_tracker ${catkin_LIBRARIES} -lstdc++fs)
 
+add_executable(traj_server exe/main_traj_server.cpp)
+target_link_libraries(traj_server ${catkin_LIBRARIES})
+
 
 add_dependencies(comparison_controller ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(bpmp_ros_type_converter ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(bpmp_tracker ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(bpmp_simulator ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(bpmp_predictor ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(traj_server ${catkin_EXPORTED_TARGETS})
 
 install(TARGETS
  bpmp_predictor

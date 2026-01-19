@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 <launch>
     <arg name="rviz_display" default="true"/>
-    <group if = "$(arg rviz_display)">
+    <!-- <group if = "$(arg rviz_display)">
         <node name="rviz" pkg="rviz" type="rviz" args="-d $(find bpmp_tracker)/launch/rviz_config/dynamic_sim.rviz" output="log"/>
-    </group>
+    </group> -->
 
-    <node pkg="bpmp_tracker" type="bpmp_simulator" name="bpmp_simulator" output="screen">
+    <!-- <node pkg="bpmp_tracker" type="bpmp_simulator" name="bpmp_simulator" output="screen">
         <rosparam command="load" file="$(find bpmp_tracker)/param/analysis/sim00.yaml"/>
         <param name="object_history_file_name" value="$(find bpmp_tracker)/world/analysis/gar_1.csv"/>
         <param name="object_history_file_path_name" value="$(find bpmp_tracker)/world/analysis"/>
@@ -15,16 +15,10 @@
           args="0 0 0 0 0 0 world map" />
     <node pkg="bpmp_tracker" type="elastic_type_converter" name="elastic_type_converter" output="screen">
         <rosparam command="load" file="$(find bpmp_tracker)/param/comparison/elastic_type_converter.yaml"/>
-    </node>
+    </node> -->
     <node pkg="bpmp_tracker" type="elastic_tracker" name="elastic_tracker" output="screen">
         <rosparam command="load" file="$(find bpmp_tracker)/param/comparison/elastic_tracker.yaml"/>
     </node>
-    <node pkg="bpmp_tracker" type="traj_server" name="traj_server" output="screen">
-        <rosparam command="load" file="$(find bpmp_tracker)/param/comparison/elastic_tracker.yaml"/>
-        <remap from="~position_cmd" to="position_cmd"/>
-        <remap from="~trajectory" to="/elastic_tracker/trajectory"/>
-        <remap from="~odometry" to="/base_odom"/>
-        <remap from="~unicycle_control_input" to="/bpmp_tracker/unicycle_control_input"/>
-    </node>
+
 
 </launch>

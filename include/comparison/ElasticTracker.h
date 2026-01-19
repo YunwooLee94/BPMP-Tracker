@@ -19,6 +19,7 @@
 #include <comparison/Prediction.hpp>
 #include <quadrotor_msgs/PolyTraj.h>
 #include <comparison/Visualization.hpp>
+#include <comparison/Env.hpp>
 
 
 namespace bpmp{
@@ -73,11 +74,19 @@ namespace bpmp{
         std::shared_ptr<traj_opt::TrajOpt> trajOptPtr_;
         std::shared_ptr<prediction::Predict> prePtr_;
         std::shared_ptr<visualization::Visualization> visPtr_;
+        std::shared_ptr<env::Env> envPtr_;
+        ros::Time replan_stamp_;
+        bool force_hover_ = true;
+
+
+
 
 
         void Planning();
         void pub_hover_p(const Eigen::Vector3d& hover_p, const ros::Time& stamp);
-        
+        bool validcheck(const Trajectory& traj, const ros::Time& t_start, const double& check_dur);
+        void pub_traj(const Trajectory& traj, const double& yaw, const ros::Time& stamp);
+
         ros::Publisher traj_pub_;
 
     public:

@@ -23,6 +23,7 @@ bpmp::ElasticTracker::ElasticTracker():nh_("~") {
     visPtr_ = std::make_shared<visualization::Visualization>(nh_);
     trajOptPtr_ = std::make_shared<traj_opt::TrajOpt>(nh_);
     prePtr_ = std::make_shared<prediction::Predict>(nh_);
+    envPtr_ = std::make_shared<env::Env>(nh_, gridmapPtr_);
 
     tracker_sub_ = nh_.subscribe("/base_odom", 1,
                                               &ElasticTracker::TrackerStateCallback, this);
@@ -40,8 +41,10 @@ bpmp::ElasticTracker::ElasticTracker():nh_("~") {
 void bpmp::ElasticTracker::Run() {
     ros::Rate loop_rate(20.0);
     while(ros::ok()){
-        if(IsInfoReady())
+        if(IsInfoReady()){
+            // ROS_WARN("[ELASTIC TRACKER]: All info received. Start Elastic Tracking Planning...");
             Planning();
+        }
         ros::spinOnce();
         loop_rate.sleep();
     }
@@ -59,41 +62,43 @@ void bpmp::ElasticTracker::TargetStateCallback(const bpmp_tracker::ObjectState &
 }
 
 void bpmp::ElasticTracker::TrackerStateCallback(const nav_msgs::Odometry &msg) {
-    if (!is_tracker_info_received_) {
-        prev_time_ = msg.header.stamp.toSec();
-        prev_pose_[0] = msg.pose.pose.position.x;
-        prev_pose_[1] = msg.pose.pose.position.y;
-        is_tracker_info_received_ = true;
-    }
-    else if (sqrt(pow(prev_pose_[0] - msg.pose.pose.position.x, 2)) +
-            pow(prev_pose_[1] - msg.pose.pose.position.y, 2) > 0.1){
-        is_tracker_info_received_ = false;
-        std::cout<<"[ELASTIC TRACKER]: Tracker position jump detected! Resetting tracker info..."<<std::endl;
-        tracker_velocity_ = 0.0;
-    }
-    current_tracker_state_.px = msg.pose.pose.position.x;
-    current_tracker_state_.py = msg.pose.pose.position.y;
-    current_tracker_state_.pz = msg.pose.pose.position.z;
-    double q[4] {msg.pose.pose.orientation.w,
-                 msg.pose.pose.orientation.x,
-                 msg.pose.pose.orientation.y,
-                 msg.pose.pose.orientation.z};
-    current_tracker_state_.theta = atan2(
-            2.0 * (q[0] * q[3] + q[1] * q[2]),
-            1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3])
-    );
-    double dt = msg.header.stamp.toSec() - prev_time_;
-    prev_time_ = msg.header.stamp.toSec();
-    double dx = msg.pose.pose.position.x - prev_pose_[0];
-    double dy = msg.pose.pose.position.y - prev_pose_[1];
-    prev_pose_[0] = msg.pose.pose.position.x;
-    prev_pose_[1] = msg.pose.pose.position.y;
-    double velocity_dir = (dx * cos(current_tracker_state_.theta) + dy * sin(current_tracker_state_.theta)) >= 0 ? 1.0 : -1.0;
-    if (dt > 1e-6) {
-        tracker_velocity_ = velocity_dir * sqrt(dx * dx + dy * dy) / dt;
-    } else {
-        tracker_velocity_ = 0.0;
-    }
+  current_tracker_state_.px = msg.pose.pose.position.x;
+  current_tracker_state_.py = msg.pose.pose.position.y;
+  current_tracker_state_.pz = msg.pose.pose.position.z;
+  double q[4] {msg.pose.pose.orientation.w,
+              msg.pose.pose.orientation.x,
+              msg.pose.pose.orientation.y,
+              msg.pose.pose.orientation.z};
+  current_tracker_state_.theta = atan2(
+          2.0 * (q[0] * q[3] + q[1] * q[2]),
+          1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3])
+        );
+  
+  if (!is_tracker_info_received_) {
+      tracker_velocity_ = 0.0;
+      is_tracker_info_received_ = true;
+      std::cout<<"[ELASTIC TRACKER]: Received first tracker info."<<std::endl;
+  }
+  else if (sqrt(pow(prev_pose_[0] - msg.pose.pose.position.x, 2)) +
+          pow(prev_pose_[1] - msg.pose.pose.position.y, 2) > 0.1){
+      std::cout<<"[ELASTIC TRACKER]: Tracker position jump detected! Resetting tracker info..."<<std::endl;
+      tracker_velocity_ = 0.0;
+      is_tracker_info_received_ = false;
+  }
+  else{
+      double dt = msg.header.stamp.toSec() - prev_time_;
+      double dx = msg.pose.pose.position.x - prev_pose_[0];
+      double dy = msg.pose.pose.position.y - prev_pose_[1];
+      double velocity_dir = (dx * cos(current_tracker_state_.theta) + dy * sin(current_tracker_state_.theta)) >= 0 ? 1.0 : -1.0;
+      if (dt > 1e-6) {
+          tracker_velocity_ = velocity_dir * sqrt(dx * dx + dy * dy) / dt;
+      } else {
+          tracker_velocity_ = 0.0;
+      }
+  }
+  prev_time_ = msg.header.stamp.toSec();
+  prev_pose_[0] = msg.pose.pose.position.x;
+  prev_pose_[1] = msg.pose.pose.position.y;
 //    std::cout<<"[ELASTIC TRACKER]: Got Tracker State"<<std::endl;
 }
 
@@ -134,6 +139,47 @@ void bpmp::ElasticTracker::pub_hover_p(const Eigen::Vector3d& hover_p, const ros
     traj_pub_.publish(traj_msg);
 }
 
+bool bpmp::ElasticTracker::validcheck(const Trajectory& traj, const ros::Time& t_start, const double& check_dur = 1.0) {
+    double t0 = (ros::Time::now() - t_start).toSec();
+    t0 = t0 > 0.0 ? t0 : 0.0;
+    double delta_t = check_dur < traj.getTotalDuration() ? check_dur : traj.getTotalDuration();
+    for (double t = t0; t < t0 + delta_t; t += 0.01) {
+      Eigen::Vector3d p = traj.getPos(t);
+      if (gridmapPtr_->isOccupied(p)) {
+        return false;
+      }
+    }
+    return true;
+}
+
+void bpmp::ElasticTracker::pub_traj(const Trajectory& traj, const double& yaw, const ros::Time& stamp) {
+    quadrotor_msgs::PolyTraj traj_msg;
+    traj_msg.hover = false;
+    traj_msg.order = 5;
+    Eigen::VectorXd durs = traj.getDurations();
+    int piece_num = traj.getPieceNum();
+    traj_msg.duration.resize(piece_num);
+    traj_msg.coef_x.resize(6 * piece_num);
+    traj_msg.coef_y.resize(6 * piece_num);
+    traj_msg.coef_z.resize(6 * piece_num);
+    for (int i = 0; i < piece_num; ++i) {
+      traj_msg.duration[i] = durs(i);
+      CoefficientMat cMat = traj[i].getCoeffMat();
+      int i6 = i * 6;
+      for (int j = 0; j < 6; j++) {
+        traj_msg.coef_x[i6 + j] = cMat(0, j);
+        traj_msg.coef_y[i6 + j] = cMat(1, j);
+        traj_msg.coef_z[i6 + j] = cMat(2, j);
+      }
+    }
+    traj_msg.start_time = stamp;
+    traj_msg.traj_id = traj_id_++;
+    // NOTE yaw
+    traj_msg.yaw = yaw;
+    traj_pub_.publish(traj_msg);
+    // std::cout<<"[planner] Published new trajectory."<<std::endl;
+}
+
 void bpmp::ElasticTracker::Planning() {
     // obtain state of odom
     Eigen::Vector3d odom_p(current_tracker_state_.px,
@@ -157,16 +203,16 @@ void bpmp::ElasticTracker::Planning() {
     Eigen::Vector3d target_v(current_target_state_.vx,
                              current_target_state_.vy,
                              0);
-    Eigen::Quaterniond target_q; // isn't it useless? //승우
+    // Eigen::Quaterniond target_q; // isn't it useless? //승우
     // target_q.w() = replanStateMsg_.target.pose.pose.orientation.w;
     // target_q.x() = replanStateMsg_.target.pose.pose.orientation.x;
     // target_q.y() = replanStateMsg_.target.pose.pose.orientation.y;
     // target_q.z() = replanStateMsg_.target.pose.pose.orientation.z;
 
-    // NOTE force-hover: waiting for the speed of drone small enough //비상정지 force_hover_ 필요없을듯? 
-    // if (force_hover_ && odom_v.norm() > 0.1) {
-    //   return;
-    // }
+    // NOTE force-hover: waiting for the speed of drone small enough
+    if (force_hover_ && odom_v.norm() > 0.1) {
+      return;
+    }
 
     // target_p.z() += 1.0; // 필요없을듯?
     // NOTE determin whether to replan
@@ -200,11 +246,13 @@ void bpmp::ElasticTracker::Planning() {
     prePtr_->setMap(*gridmapPtr_);
 
     // visualize the ray from drone to target
-    // if (envPtr_->checkRayValid(odom_p, target_p)) {
-    //   visPtr_->visualize_arrow(odom_p, target_p, "ray", visualization::yellow);
-    // } else {
-    //   visPtr_->visualize_arrow(odom_p, target_p, "ray", visualization::red);
-    // }
+    if (envPtr_->checkRayValid(odom_p, target_p)) {
+      visPtr_->visualize_arrow(odom_p, target_p, "ray", visualization::yellow);
+      // std::cout << "[planner] Ray valid." << std::endl;
+    } else {
+      visPtr_->visualize_arrow(odom_p, target_p, "ray", visualization::red);
+      // std::cout << "[planner] Ray invalid." << std::endl;
+    }
 
     // NOTE prediction
     std::vector<Eigen::Vector3d> target_predcit;
@@ -227,25 +275,28 @@ void bpmp::ElasticTracker::Planning() {
     }
 
     /*Planning start here*/
-    /*
+    
     // NOTE replan state
     Eigen::MatrixXd iniState;
     iniState.setZero(3, 3);
-    ros::Time replan_stamp = ros::Time::now() + ros::Duration(0.03);
-    double replan_t = (replan_stamp - replan_stamp_).toSec();
-    if (force_hover_ || replan_t > traj_poly_.getTotalDuration()) {
+    // ros::Time replan_stamp = ros::Time::now() + ros::Duration(0.03);
+    ros::Time replan_stamp = ros::Time::now();
+    
+    // double replan_t = (replan_stamp - replan_stamp_).toSec();
+    // if (force_hover_ || replan_t > traj_poly_.getTotalDuration()) {
+    // if (replan_t > traj_poly_.getTotalDuration()) {
       // should replan from the hover state
-      iniState.col(0) = odom_p;
-      iniState.col(1) = odom_v;
-    } else {
-      // should replan from the last trajectory
-      iniState.col(0) = traj_poly_.getPos(replan_t);
-      iniState.col(1) = traj_poly_.getVel(replan_t);
-      iniState.col(2) = traj_poly_.getAcc(replan_t);
-    }
-    replanStateMsg_.header.stamp = ros::Time::now();
-    replanStateMsg_.iniState.resize(9);
-    Eigen::Map<Eigen::MatrixXd>(replanStateMsg_.iniState.data(), 3, 3) = iniState;
+    iniState.col(0) = odom_p;
+    iniState.col(1) = odom_v;
+    // } else {
+    //   // should replan from the last trajectory
+    //   iniState.col(0) = traj_poly_.getPos(replan_t);
+    //   iniState.col(1) = traj_poly_.getVel(replan_t);
+    //   iniState.col(2) = traj_poly_.getAcc(replan_t);
+    // }
+    // replanStateMsg_.header.stamp = ros::Time::now();
+    // replanStateMsg_.iniState.resize(9);
+    // Eigen::Map<Eigen::MatrixXd>(replanStateMsg_.iniState.data(), 3, 3) = iniState;
 
     // NOTE path searching
     Eigen::Vector3d p_start = iniState.col(0);
@@ -262,12 +313,13 @@ void bpmp::ElasticTracker::Planning() {
     // double t_path = 0;
 
     if (generate_new_traj_success) {
-      // ros::Time t_front0 = ros::Time::now();
-      if (land_triger_received_) {
-        generate_new_traj_success = envPtr_->short_astar(p_start, target_p, path);
-      } else {
-        generate_new_traj_success = envPtr_->findVisiblePath(p_start, target_predcit, way_pts, path);
-      }
+      ros::Time t_front0 = ros::Time::now();
+      // if (land_triger_received_) {
+        // generate_new_traj_success = envPtr_->short_astar(p_start, target_p, path);
+      // } else {
+      envPtr_->setMap(gridmapPtr_);
+      generate_new_traj_success = envPtr_->findVisiblePath(p_start, target_predcit, way_pts, path);
+      // }
       // ros::Time t_end0 = ros::Time::now();
       // t_path += (t_end0 - t_front0).toSec() * 1e3;
     }
@@ -276,12 +328,13 @@ void bpmp::ElasticTracker::Planning() {
     std::vector<double> thetas;
     Trajectory traj;
     if (generate_new_traj_success) {
+      // std::cout << "[planner] Path found." << std::endl;
       visPtr_->visualize_path(path, "astar");
-      if (land_triger_received_) {
-        for (const auto& p : target_predcit) {
-          path.push_back(p);
-        }
-      } else {
+      // if (land_triger_received_) {
+      //   for (const auto& p : target_predcit) {
+      //     path.push_back(p);
+      //   }
+      // } else {
         // NOTE generate visible regions
         target_predcit.pop_back();
         way_pts.pop_back();
@@ -304,7 +357,7 @@ void bpmp::ElasticTracker::Planning() {
         envPtr_->pts2path(way_pts, path);
         // ros::Time t_end2 = ros::Time::now();
         // t_path += (t_end2 - t_front2).toSec() * 1e3;
-      }
+      // }
       // NOTE corridor generating
       std::vector<Eigen::MatrixXd> hPolys;
       std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> keyPts;
@@ -323,14 +376,15 @@ void bpmp::ElasticTracker::Planning() {
       finState.col(0) = path.back();
       finState.col(1) = target_v;
       // ros::Time t_front4 = ros::Time::now();
-      if (land_triger_received_) {
-        finState.col(0) = target_predcit.back();
-        generate_new_traj_success = trajOptPtr_->generate_traj(iniState, finState, target_predcit, hPolys, traj);
-      } else {
-        generate_new_traj_success = trajOptPtr_->generate_traj(iniState, finState,
-                                                               target_predcit, visible_ps, thetas,
-                                                               hPolys, traj);
-      }
+      // if (land_triger_received_) {
+      //   finState.col(0) = target_predcit.back();
+      //   generate_new_traj_success = trajOptPtr_->generate_traj(iniState, finState, target_predcit, hPolys, traj);
+      // } else {
+
+      generate_new_traj_success = trajOptPtr_->generate_traj(iniState, finState,
+                                                              target_predcit, visible_ps, thetas,
+                                                              hPolys, traj);
+      // }
       // ros::Time t_end4 = ros::Time::now();
       // double t_optimization = (t_end4 - t_front4).toSec() * 1e3;
 
@@ -345,6 +399,7 @@ void bpmp::ElasticTracker::Planning() {
       // std::cout << "t_optimization_: " << t_optimization_ << " ms" << std::endl;
 
       visPtr_->visualize_traj(traj, "traj");
+
     }
 
     // NOTE collision check
@@ -352,14 +407,15 @@ void bpmp::ElasticTracker::Planning() {
     if (generate_new_traj_success) {
       valid = validcheck(traj, replan_stamp);
     } else {
-      replanStateMsg_.state = -2;
-      replanState_pub_.publish(replanStateMsg_);
+      // replanStateMsg_.state = -2;
+      // replanState_pub_.publish(replanStateMsg_);
+      ROS_WARN("[planner] Trajectory generation failed! result path is collided.");
     }
     if (valid) {
       force_hover_ = false;
       ROS_WARN("[planner] REPLAN SUCCESS");
-      replanStateMsg_.state = 0;
-      replanState_pub_.publish(replanStateMsg_);
+      // replanStateMsg_.state = 0;
+      // replanState_pub_.publish(replanStateMsg_);
       Eigen::Vector3d dp = target_p + target_v * 0.03 - iniState.col(0);
       // NOTE : if the drone is going to unknown areas, watch that direction
       // Eigen::Vector3d un_known_p = traj.getPos(1.0);
@@ -367,32 +423,32 @@ void bpmp::ElasticTracker::Planning() {
       //   dp = un_known_p - odom_p;
       // }
       double yaw = std::atan2(dp.y(), dp.x());
-      if (land_triger_received_) {
-        yaw = 2 * std::atan2(target_q.z(), target_q.w());
-      }
+      // if (land_triger_received_) {
+      //   yaw = 2 * std::atan2(target_q.z(), target_q.w());
+      // }
       pub_traj(traj, yaw, replan_stamp);
       traj_poly_ = traj;
       replan_stamp_ = replan_stamp;
     } else if (force_hover_) {
       ROS_ERROR("[planner] REPLAN FAILED, HOVERING...");
-      replanStateMsg_.state = 1;
-      replanState_pub_.publish(replanStateMsg_);
+      // replanStateMsg_.state = 1;
+      // replanState_pub_.publish(replanStateMsg_);
       return;
-    } else if (validcheck(traj_poly_, replan_stamp_)) {
+    } else if (!validcheck(traj_poly_, replan_stamp_)) {
       force_hover_ = true;
       ROS_FATAL("[planner] EMERGENCY STOP!!!");
-      replanStateMsg_.state = 2;
-      replanState_pub_.publish(replanStateMsg_);
+      // replanStateMsg_.state = 2;
+      // replanState_pub_.publish(replanStateMsg_);
       pub_hover_p(iniState.col(0), replan_stamp);
       return;
     } else {
       ROS_ERROR("[planner] REPLAN FAILED, EXECUTE LAST TRAJ...");
-      replanStateMsg_.state = 3;
-      replanState_pub_.publish(replanStateMsg_);
+      // replanStateMsg_.state = 3;
+      // replanState_pub_.publish(replanStateMsg_);
       return;  // current generated traj invalid but last is valid
     }
     visPtr_->visualize_traj(traj, "traj");
-    */
+    
     /*Planning end here*/
 }
 
