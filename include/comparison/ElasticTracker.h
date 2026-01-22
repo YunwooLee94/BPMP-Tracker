@@ -68,6 +68,7 @@ namespace bpmp{
         std::shared_ptr<mapping::OccGridMap> gridmapPtr_;
 
         double tracking_dist_, tolerance_d_, tracking_dur_, tracking_dt_;
+        int plan_hz_;
         int traj_id_{0};
 
         Trajectory traj_poly_;

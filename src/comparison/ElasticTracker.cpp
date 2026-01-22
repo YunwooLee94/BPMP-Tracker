@@ -14,6 +14,7 @@ bpmp::ElasticTracker::ElasticTracker():nh_("~") {
     nh_.param<double>("tolerance_d",tolerance_d_,0.3);
     nh_.param<double>("tracking_dur",tracking_dur_,3.0);
     nh_.param<double>("tracking_dt",tracking_dt_,0.2);
+    nh_.param<int>("plan_hz",plan_hz_,10);
 
     gridmapPtr_ = std::make_shared<mapping::OccGridMap>();
     mapping::OccGridMap temp_map;
@@ -39,7 +40,7 @@ bpmp::ElasticTracker::ElasticTracker():nh_("~") {
 }
 
 void bpmp::ElasticTracker::Run() {
-    ros::Rate loop_rate(20.0);
+    ros::Rate loop_rate(plan_hz_);
     while(ros::ok()){
         if(IsInfoReady()){
             // ROS_WARN("[ELASTIC TRACKER]: All info received. Start Elastic Tracking Planning...");
@@ -73,7 +74,8 @@ void bpmp::ElasticTracker::TrackerStateCallback(const nav_msgs::Odometry &msg) {
           2.0 * (q[0] * q[3] + q[1] * q[2]),
           1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3])
         );
-  
+  double cur_time = msg.header.stamp.toSec();
+
   if (!is_tracker_info_received_) {
       tracker_velocity_ = 0.0;
       is_tracker_info_received_ = true;
@@ -86,9 +88,9 @@ void bpmp::ElasticTracker::TrackerStateCallback(const nav_msgs::Odometry &msg) {
       is_tracker_info_received_ = false;
   }
   else{
-      double dt = msg.header.stamp.toSec() - prev_time_;
-      double dx = msg.pose.pose.position.x - prev_pose_[0];
-      double dy = msg.pose.pose.position.y - prev_pose_[1];
+      double dt = cur_time - prev_time_;
+      double dx = current_tracker_state_.px - prev_pose_[0];
+      double dy = current_tracker_state_.py - prev_pose_[1];
       double velocity_dir = (dx * cos(current_tracker_state_.theta) + dy * sin(current_tracker_state_.theta)) >= 0 ? 1.0 : -1.0;
       if (dt > 1e-6) {
           tracker_velocity_ = velocity_dir * sqrt(dx * dx + dy * dy) / dt;
@@ -96,9 +98,9 @@ void bpmp::ElasticTracker::TrackerStateCallback(const nav_msgs::Odometry &msg) {
           tracker_velocity_ = 0.0;
       }
   }
-  prev_time_ = msg.header.stamp.toSec();
-  prev_pose_[0] = msg.pose.pose.position.x;
-  prev_pose_[1] = msg.pose.pose.position.y;
+  prev_time_ = cur_time;
+  prev_pose_[0] = current_tracker_state_.px;
+  prev_pose_[1] = current_tracker_state_.py;
 //    std::cout<<"[ELASTIC TRACKER]: Got Tracker State"<<std::endl;
 }
 
@@ -279,20 +281,19 @@ void bpmp::ElasticTracker::Planning() {
     // NOTE replan state
     Eigen::MatrixXd iniState;
     iniState.setZero(3, 3);
-    // ros::Time replan_stamp = ros::Time::now() + ros::Duration(0.03);
+    // ros::Time replan_stamp = ros::Time::now() + ros::Duration(0.03); // TODO why????
     ros::Time replan_stamp = ros::Time::now();
     
-    // double replan_t = (replan_stamp - replan_stamp_).toSec();
+    double replan_t = (replan_stamp - replan_stamp_).toSec();
     // if (force_hover_ || replan_t > traj_poly_.getTotalDuration()) {
-    // if (replan_t > traj_poly_.getTotalDuration()) {
-      // should replan from the hover state
-    iniState.col(0) = odom_p;
-    iniState.col(1) = odom_v;
+        // should replan from the hover state
+        iniState.col(0) = odom_p;
+        iniState.col(1) = odom_v;
     // } else {
-    //   // should replan from the last trajectory
-    //   iniState.col(0) = traj_poly_.getPos(replan_t);
-    //   iniState.col(1) = traj_poly_.getVel(replan_t);
-    //   iniState.col(2) = traj_poly_.getAcc(replan_t);
+      // should replan from the last trajectory
+      // iniState.col(0) = traj_poly_.getPos(replan_t);
+      // iniState.col(1) = traj_poly_.getVel(replan_t);
+      // iniState.col(2) = traj_poly_.getAcc(replan_t);
     // }
     // replanStateMsg_.header.stamp = ros::Time::now();
     // replanStateMsg_.iniState.resize(9);

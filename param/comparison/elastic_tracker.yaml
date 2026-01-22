@@ -4,22 +4,28 @@ z_length: 1.0 # Map size, z: [-z_length, z_length]
 resolution: 0.05
 agent_size: 0.25
 
-plan_hz: 20
+
+plan_hz: 10
 K: 8
 vmax: 3.0
 amax: 6.0
 wmax: 3.0
 rhoT: 100.0
 rhoV: 1000.0
-rhoA: 1000.0
-rhoTracking: 1000.0
-rhosVisibility: 10000.0
+rhoA: 10.0
+rhoTracking: 10000.0
+rhosVisibility: 1000.0
 theta_clearance: 0.8
 clearance_d: 0.2
-tolerance_d: 0.5
+tolerance_d: 0.2
 tracking_dist: 1.0
 tracking_dur: 3.0
 tracking_dt: 0.2
+
+controller:
+  k_x : 1.0
+  k_y : 1.0
+  k_theta : 3.0
 
 prediction:
   rho_a: 1.0

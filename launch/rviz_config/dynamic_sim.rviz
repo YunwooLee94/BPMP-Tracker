@@ -253,41 +253,7 @@ Visualization Manager:
       Marker Topic: /bpmp_simulator/obstacle_list_vis
       Name: MarkerArray
       Namespaces:
-        0: true
-        1: true
-        10: true
-        11: true
-        12: true
-        13: true
-        14: true
-        15: true
-        16: true
-        17: true
-        18: true
-        19: true
-        2: true
-        20: true
-        21: true
-        22: true
-        23: true
-        24: true
-        25: true
-        26: true
-        27: true
-        28: true
-        29: true
-        3: true
-        30: true
-        31: true
-        32: true
-        33: true
-        34: true
-        4: true
-        5: true
-        6: true
-        7: true
-        8: true
-        9: true
+        {}
       Queue Size: 1
       Value: true
     - Alpha: 1
@@ -745,10 +711,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 38.95976638793945
-      Target Frame: <Fixed Frame>
-      X: 0
-      Y: 0
+      Scale: 43.63493728637695
+      Target Frame: current
+      X: 2.528850793838501
+      Y: 4.325651168823242
     Saved: ~
 Window Geometry:
   Displays:
