@@ -13,7 +13,7 @@ wmax: 3.0
 rhoT: 100.0
 rhoV: 1000.0
 rhoA: 10.0
-rhoTracking: 10000.0
+rhoTracking: 100000.0
 rhosVisibility: 1000.0
 theta_clearance: 0.8
 clearance_d: 0.2

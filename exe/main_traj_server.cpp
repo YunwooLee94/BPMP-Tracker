@@ -78,46 +78,49 @@ void publish_cmd(int traj_id,
   Eigen::Vector3d heading_vec(std::cos(cur_position[2]), std::sin(cur_position[2]), 0);
 
   ////////VERSION1 //////
-  // Eigen::Vector3d v_proj = heading_vec * v.dot(heading_vec);
-  // Eigen::Vector3d a_proj = heading_vec * a.dot(heading_vec);
-  // Eigen::Vector3d v_cmd = v_proj + a_proj * kCmdDt;
+  Eigen::Vector3d v_proj = heading_vec * v.dot(heading_vec);
+  Eigen::Vector3d a_proj = heading_vec * a.dot(heading_vec);
+  Eigen::Vector3d v_cmd = v_proj + a_proj * 0.01;
   // Eigen::Vector3d v_cmd = heading_vec * v.dot(heading_vec);
-  // cmd_vel.vel_linear = std::sqrt(v_cmd(0) * v_cmd(0) + v_cmd(1) * v_cmd(1));
-  // // angular velocity from lateral acceleration
-  // if (cmd_vel.vel_linear < 1e-6) {
-  //   // std::cout << "[traj_server] v_proj too small, using desired yaw rate." << std::endl;
-  //   cmd_vel.vel_angular = yd;
-  // } else{
-  //   // std::cout << "[traj_server] v_proj: " << v_proj.transpose() << ", a_proj: " << a_proj.transpose() << std::endl;
-  //   cmd_vel.vel_angular = (a(1) * heading_vec(0) - a(0) * heading_vec(1)) / (v_cmd.squaredNorm() + 1e-6);
-  // }
-  // cmd_vel.vel_angular = std::max(std::min(cmd_vel.vel_angular, wmax_), -wmax_);
-  // cmd_vel_pub_.publish(cmd_vel);
-
-  ////////VERSION2////////
-  Eigen::Vector3d v_cmd = heading_vec * v.dot(heading_vec);
   int v_dir = (v_cmd(0) * std::cos(cur_position[2]) + v_cmd(1) * std::sin(cur_position[2])) >= 0 ? 1 : -1;
   double v_des = std::sqrt(v_cmd(0) * v_cmd(0) + v_cmd(1) * v_cmd(1)) * v_dir;
-  double w_des = 0.0; // TODO get from trajectory ?
-  Eigen::Vector3d e;
-  e(0) = p(0) - cur_position[0];
-  e(1) = p(1) - cur_position[1];
-  e(2) = y - cur_position[2];
 
-  // std::cout << "[traj_server] cur_yaw: " << cur_position[2] << ", des_yaw: " << y << std::endl;
-  e(2) = e(2) >= M_PI ? e(2) - 2 * M_PI : e(2);
-  e(2) = e(2) <= -M_PI ? e(2) + 2 * M_PI : e(2);
-  Eigen::Matrix3d M;
-  M << std::cos(cur_position[2]), std::sin(cur_position[2]), 0,
-       -std::sin(cur_position[2]), std::cos(cur_position[2]), 0,
-       0, 0, 1;
-  Eigen::Vector3d E = M * e;
-  cmd_vel.vel_linear = v_des*std::cos(E(2)) + k_x_ * E(0);
-  std::cout << "[traj_server] v_des: " << v_des << ", k_x_ * E(0): " << k_x_ * E(0) << std::endl;
-  // cmd_vel.vel_linear = k_x_ * E(0);
-  cmd_vel.vel_angular = w_des + v_des * (k_y_ * E(1) + k_theta_ * std::sin(E(2)));
+  cmd_vel.vel_linear = v_des;
+  // angular velocity from lateral acceleration
+  if (cmd_vel.vel_linear < 1e-6) {
+    // std::cout << "[traj_server] v_proj too small, using desired yaw rate." << std::endl;
+    cmd_vel.vel_angular = yd;
+  } else{
+    // std::cout << "[traj_server] v_proj: " << v_proj.transpose() << ", a_proj: " << a_proj.transpose() << std::endl;
+    cmd_vel.vel_angular = (a(1) * heading_vec(0) - a(0) * heading_vec(1)) / (v_cmd.squaredNorm() + 1e-6);
+  }
   cmd_vel.vel_angular = std::max(std::min(cmd_vel.vel_angular, wmax_), -wmax_);
   cmd_vel_pub_.publish(cmd_vel);
+
+  ////////VERSION2////////
+  // Eigen::Vector3d v_cmd = heading_vec * v.dot(heading_vec);
+  // int v_dir = (v_cmd(0) * std::cos(cur_position[2]) + v_cmd(1) * std::sin(cur_position[2])) >= 0 ? 1 : -1;
+  // double v_des = std::sqrt(v_cmd(0) * v_cmd(0) + v_cmd(1) * v_cmd(1)) * v_dir;
+  // double w_des = 0.0; // TODO get from trajectory ?
+  // Eigen::Vector3d e;
+  // e(0) = p(0) - cur_position[0];
+  // e(1) = p(1) - cur_position[1];
+  // e(2) = y - cur_position[2];
+
+  // // std::cout << "[traj_server] cur_yaw: " << cur_position[2] << ", des_yaw: " << y << std::endl;
+  // e(2) = e(2) >= M_PI ? e(2) - 2 * M_PI : e(2);
+  // e(2) = e(2) <= -M_PI ? e(2) + 2 * M_PI : e(2);
+  // Eigen::Matrix3d M;
+  // M << std::cos(cur_position[2]), std::sin(cur_position[2]), 0,
+  //      -std::sin(cur_position[2]), std::cos(cur_position[2]), 0,
+  //      0, 0, 1;
+  // Eigen::Vector3d E = M * e;
+  // // cmd_vel.vel_linear = v_des*std::cos(E(2)) + k_x_ * E(0);
+  // cmd_vel.vel_linear = v_des + k_x_ * E(0);
+  // // std::cout << "[traj_server] v_des: " << v_des << ", k_x_ * E(0): " << k_x_ * E(0) << std::endl;
+  // cmd_vel.vel_angular = w_des + v_des * (k_y_ * E(1) + k_theta_ * std::sin(E(2)));
+  // cmd_vel.vel_angular = std::max(std::min(cmd_vel.vel_angular, wmax_), -wmax_);
+  // cmd_vel_pub_.publish(cmd_vel);
 }
 
 // double update_yaw(double desired_yaw, double &yaw_dot) {
