@@ -6,15 +6,20 @@
 bool bpmp::Tracker::Plan(const double &t_trigger) {
     if (CheckInfoAvailable())
         UpdateValue(t_trigger);
-    else
-        return false;
-    if(IsTargetStatic()){
-//        static int cnt=0;
-//        cout<<"STOPSTOP: "<<cnt++<<endl;
+    else{
+        cout<<"INFO NOT AVAILABLE"<<endl;
         return false;
     }
 
+        
+    // if(IsTargetStatic()){
+//        static int cnt=0;
+//        cout<<"STOPSTOP: "<<cnt++<<endl;
+    //     return false;
+    // }
+
     if(not SampleEndPoint()){
+        cout<<"SAMPLE END POINT FAILED"<<endl;
         return false;
     }
     GeneratePrimitive(t_trigger);
@@ -23,54 +28,50 @@ bool bpmp::Tracker::Plan(const double &t_trigger) {
     if(visible_index_.empty()){
         pass_test0 = false;
         cout<<"NO VISIBLE INDEX"<<endl;
+        return false;
     }
-    if(pass_test0){
-        switch (EnvironmentMode()){
-            case 0:{
-                safe_index_.clear();
-                safe_index_ = GetSafeIndexUnstructured(visible_index_); // Target Distance + Collision and Occlusion Avoidance against Obstacles
-                break;
-            }
-            case 1:{
-                safe_index_.clear();
-                safe_index_ = GetSafeIndexDynamic(visible_index_);
-                break;
-            }
-            case 2:{
-                safe_index_.clear();
-                std::vector<uint> temp_safe_index = GetSafeIndexUnstructured(visible_index_);
-                safe_index_ = GetSafeIndexDynamic(temp_safe_index);
-                break;
-            }
-            default:{
-                cout<<"CheckModeERROR"<<endl;
-                return false;
+    switch (EnvironmentMode()){
+        case 0:{
+            safe_index_.clear();
+            safe_index_ = GetSafeIndexUnstructured(visible_index_); // Target Distance + Collision and Occlusion Avoidance against Obstacles
+            break;
+        }
+        case 1:{
+            safe_index_.clear();
+            safe_index_ = GetSafeIndexDynamic(visible_index_);
+            break;
+        }
+        case 2:{
+            safe_index_.clear();
+            std::vector<uint> temp_safe_index = GetSafeIndexUnstructured(visible_index_);
+            safe_index_ = GetSafeIndexDynamic(temp_safe_index);
+            break;
+        }
+        default:{
+            cout<<"CheckModeERROR"<<endl;
+            return false;
 
-            }
         }
     }
-    else
-        return false;
+    
+        
     bool pass_test1 = true;
     if(safe_index_.empty()){
-//        cout<<"NO SAFE INDEX"<<endl;
+        cout<<"NO SAFE INDEX"<<endl;
         pass_test1 = false;
-    }
-    if (pass_test1) {
-        GetDynamicallyFeasibleIndex();
-    } else{
         return false;
     }
-
+    
+    GetDynamicallyFeasibleIndex();
+    
     bool pass_test2 = true;
     if (dynamically_feasible_index_.empty()) {
+        cout<<"NO DYNAMICALLY FEASIBLE INDEX"<<endl;
         pass_test2 = false;
-    }
-    if (pass_test2) {
-        GetBestIndex();
-    } else{
         return false;
     }
+    GetBestIndex();
+        
     return pass_test2;
 }
 
@@ -754,6 +755,18 @@ void bpmp::Tracker::GetBestIndexThread(const int &start_idx, const int &end_idx,
     double heading_angle[2];
     double los_angle[2];
     double heading_mag, los_mag;
+    const double r_des = 0.5 * (param_.r_min + param_.r_max);
+    constexpr int kDistSamples = 5;
+
+    const auto bernstein = [](double t, const double ctrl[4]) {
+        const double u = 1.0 - t;
+        const double b0 = u * u * u;
+        const double b1 = 3.0 * u * u * t;
+        const double b2 = 3.0 * u * t * t;
+        const double b3 = t * t * t;
+        return b0 * ctrl[0] + b1 * ctrl[1] + b2 * ctrl[2] + b3 * ctrl[3];
+    };
+
     for(int idx = start_idx;idx<end_idx;idx++){
         heading_angle[0] = primitive_[dynamically_feasible_index_[idx]].ctrl_x[3]-primitive_[dynamically_feasible_index_[idx]].ctrl_x[2];
         heading_angle[1] = primitive_[dynamically_feasible_index_[idx]].ctrl_y[3]-primitive_[dynamically_feasible_index_[idx]].ctrl_y[2];
@@ -768,9 +781,24 @@ void bpmp::Tracker::GetBestIndexThread(const int &start_idx, const int &end_idx,
         los_angle[0] = los_angle[0]/los_mag;
         los_angle[1] = los_angle[1]/los_mag;
         acc_squared_sum = -(heading_angle[0]*los_angle[0]+heading_angle[1]*los_angle[1]);
-        if(acc_squared_sum<min_acc){
+
+        // distance penalty: integral | ||p_tracker - p_target|| - r_des |
+        double dist_penalty = 0.0;
+        for (int s = 0; s < kDistSamples; ++s) {
+            const double tau = (kDistSamples == 1) ? 0.0 : double(s) / double(kDistSamples - 1);
+            const double tx = bernstein(tau, primitive_[dynamically_feasible_index_[idx]].ctrl_x);
+            const double ty = bernstein(tau, primitive_[dynamically_feasible_index_[idx]].ctrl_y);
+            const double gx = bernstein(tau, target_trajectory_.ctrl_x);
+            const double gy = bernstein(tau, target_trajectory_.ctrl_y);
+            const double dist = sqrt((tx - gx) * (tx - gx) + (ty - gy) * (ty - gy));
+            dist_penalty += fabs(dist - r_des);
+        }
+        dist_penalty *= param_.horizon / double(kDistSamples - 1);
+
+        const double total_cost = acc_squared_sum + dist_penalty;
+        if(total_cost < min_acc){
             min_acc_idx = dynamically_feasible_index_[idx];
-            min_acc = acc_squared_sum;
+            min_acc = total_cost;
         }
     }
 //    for (int idx = start_idx; idx < end_idx; idx++) {
@@ -992,8 +1020,6 @@ bool bpmp::Tracker::IsTargetStatic() {
     else
         return false;
 }
-
-
 
 
 

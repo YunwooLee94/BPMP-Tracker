@@ -161,7 +161,7 @@ bpmp::PlanningVisualizer::VisualizeBestPrimitive(const vector<bpmp::PrimitivePla
 void bpmp::PlanningVisualizer::UpdateParameter(const bpmp::VisualizationParam &param) {
     param_ = param;
     // RAW PRIMITIVE
-    raw_primitive_.header.frame_id = "current"; // TODO: have to be parameterized
+    raw_primitive_.header.frame_id = param_.tracker_frame_id;
     raw_primitive_.type = visualization_msgs::Marker::LINE_STRIP;
     raw_primitive_.scale.x = param_.raw_primitives.line_scale;
     raw_primitive_.ns = "TRACKER_RAW";
@@ -174,7 +174,7 @@ void bpmp::PlanningVisualizer::UpdateParameter(const bpmp::VisualizationParam &p
     raw_primitive_.pose.orientation.y = 0.0;
     raw_primitive_.pose.orientation.z = 0.0;
     // FEASIBLE PRIMITIVE
-    feasible_primitive_.header.frame_id = "current";
+    feasible_primitive_.header.frame_id = param_.tracker_frame_id;
     feasible_primitive_.type = visualization_msgs::Marker::LINE_STRIP;
     feasible_primitive_.scale.x = param_.feasible_primitives.line_scale;
     feasible_primitive_.ns = "TRACKER_FEASIBLE";
@@ -187,7 +187,7 @@ void bpmp::PlanningVisualizer::UpdateParameter(const bpmp::VisualizationParam &p
     feasible_primitive_.pose.orientation.y = 0.0;
     feasible_primitive_.pose.orientation.z = 0.0;
     // BEST PRIMITIVE
-    best_primitive_.header.frame_id = "current";
+    best_primitive_.header.frame_id = param_.tracker_frame_id;
     best_primitive_.type = visualization_msgs::Marker::LINE_STRIP;
     best_primitive_.scale.x = param_.best_primitive.line_scale;
     best_primitive_.ns = "TRACKER_BEST";
@@ -204,7 +204,7 @@ void bpmp::PlanningVisualizer::UpdateParameter(const bpmp::VisualizationParam &p
 bpmp::PlanningVisualizer::PlanningVisualizer(const bpmp::VisualizationParam &vis_param) {
     param_ = vis_param;
     // RAW PRIMITIVE
-    raw_primitive_.header.frame_id = "current";
+    raw_primitive_.header.frame_id = param_.tracker_frame_id;
     raw_primitive_.type = visualization_msgs::Marker::LINE_STRIP;
     raw_primitive_.scale.x = param_.raw_primitives.line_scale;
     raw_primitive_.ns = "TRACKER_RAW";
@@ -217,7 +217,7 @@ bpmp::PlanningVisualizer::PlanningVisualizer(const bpmp::VisualizationParam &vis
     raw_primitive_.pose.orientation.y = 0.0;
     raw_primitive_.pose.orientation.z = 0.0;
     // FEASIBLE PRIMITIVE
-    feasible_primitive_.header.frame_id = "current";
+    feasible_primitive_.header.frame_id = param_.tracker_frame_id;
     feasible_primitive_.type = visualization_msgs::Marker::LINE_STRIP;
     feasible_primitive_.scale.x = param_.feasible_primitives.line_scale;
     feasible_primitive_.ns = "TRACKER_FEASIBLE";
@@ -230,7 +230,7 @@ bpmp::PlanningVisualizer::PlanningVisualizer(const bpmp::VisualizationParam &vis
     feasible_primitive_.pose.orientation.y = 0.0;
     feasible_primitive_.pose.orientation.z = 0.0;
     // BEST PRIMITIVE
-    best_primitive_.header.frame_id = "current";
+    best_primitive_.header.frame_id = param_.tracker_frame_id;
     best_primitive_.type = visualization_msgs::Marker::LINE_STRIP;
     best_primitive_.scale.x = param_.best_primitive.line_scale;
     best_primitive_.ns = "TRACKER_BEST";

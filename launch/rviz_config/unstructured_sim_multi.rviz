@@ -6,11 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /Grid1
-        - /Simulator1/Obstacle1
-        - /Predictor1
-        - /GAR1
-        - /Dynamic_Obs1
+        - /GAR11/MarkerArray1
       Splitter Ratio: 0.5
     Tree Height: 710
   - Class: rviz/Selection
@@ -30,7 +26,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: PointCloud2
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -120,41 +116,6 @@ Visualization Manager:
       Name: Predictor
     - Class: rviz/Group
       Displays:
-        - Angle Tolerance: 0.10000000149011612
-          Class: rviz/Odometry
-          Covariance:
-            Orientation:
-              Alpha: 0.5
-              Color: 255; 255; 127
-              Color Style: Unique
-              Frame: Local
-              Offset: 1
-              Scale: 1
-              Value: true
-            Position:
-              Alpha: 0.30000001192092896
-              Color: 204; 51; 204
-              Scale: 1
-              Value: true
-            Value: true
-          Enabled: false
-          Keep: 1
-          Name: RobotOdom
-          Position Tolerance: 0.10000000149011612
-          Queue Size: 1
-          Shape:
-            Alpha: 1
-            Axes Length: 1
-            Axes Radius: 0.10000000149011612
-            Color: 255; 25; 0
-            Head Length: 0.30000001192092896
-            Head Radius: 0.10000000149011612
-            Shaft Length: 1
-            Shaft Radius: 0.05000000074505806
-            Value: Axes
-          Topic: /base_odom
-          Unreliable: false
-          Value: false
         - Class: rviz/TF
           Enabled: true
           Filter (blacklist): ""
@@ -162,6 +123,14 @@ Visualization Manager:
           Frame Timeout: 15
           Frames:
             All Enabled: true
+            map:
+              Value: true
+            object_base_link:
+              Value: true
+            robot_0_base_link:
+              Value: true
+            robot_1_base_link:
+              Value: true
           Marker Alpha: 1
           Marker Scale: 1
           Name: TF
@@ -169,7 +138,13 @@ Visualization Manager:
           Show Axes: true
           Show Names: true
           Tree:
-            {}
+            map:
+              object_base_link:
+                {}
+              robot_0_base_link:
+                {}
+              robot_1_base_link:
+                {}
           Update Interval: 0
           Value: true
         - Class: rviz/MarkerArray
@@ -177,7 +152,7 @@ Visualization Manager:
           Marker Topic: /bpmp_tracker/raw_primitive
           Name: RawPrimitives
           Namespaces:
-            {}
+            TRACKER_RAW: true
           Queue Size: 100
           Value: true
         - Alpha: 0.20000000298023224
@@ -199,11 +174,131 @@ Visualization Manager:
           Marker Topic: /bpmp_tracker/feasible_primitives
           Name: FeasiblePrimitives
           Namespaces:
+            TRACKER_FEASIBLE: true
+          Queue Size: 100
+          Value: true
+        - Class: rviz/MarkerArray
+          Enabled: true
+          Marker Topic: /bpmp_tracker/best_primitives
+          Name: MarkerArray
+          Namespaces:
+            TRACKER_BEST: true
+          Queue Size: 100
+          Value: true
+        - Angle Tolerance: 0
+          Class: rviz/Odometry
+          Covariance:
+            Orientation:
+              Alpha: 0.5
+              Color: 255; 255; 127
+              Color Style: Unique
+              Frame: Local
+              Offset: 1
+              Scale: 1
+              Value: true
+            Position:
+              Alpha: 0.30000001192092896
+              Color: 204; 51; 204
+              Scale: 1
+              Value: true
+            Value: true
+          Enabled: true
+          Keep: 1
+          Name: robot_0
+          Position Tolerance: 0
+          Queue Size: 10
+          Shape:
+            Alpha: 1
+            Axes Length: 1
+            Axes Radius: 0.10000000149011612
+            Color: 255; 25; 0
+            Head Length: 0.30000001192092896
+            Head Radius: 0.10000000149011612
+            Shaft Length: 1
+            Shaft Radius: 0.05000000074505806
+            Value: Arrow
+          Topic: /base_odom_0
+          Unreliable: false
+          Value: true
+      Enabled: true
+      Name: GAR0
+    - Class: rviz/Group
+      Displays:
+        - Angle Tolerance: 0
+          Class: rviz/Odometry
+          Covariance:
+            Orientation:
+              Alpha: 0.5
+              Color: 255; 255; 127
+              Color Style: Unique
+              Frame: Local
+              Offset: 1
+              Scale: 1
+              Value: true
+            Position:
+              Alpha: 0.30000001192092896
+              Color: 204; 51; 204
+              Scale: 1
+              Value: true
+            Value: true
+          Enabled: true
+          Keep: 1
+          Name: robot_1
+          Position Tolerance: 0
+          Queue Size: 1
+          Shape:
+            Alpha: 1
+            Axes Length: 1
+            Axes Radius: 0.10000000149011612
+            Color: 255; 25; 0
+            Head Length: 0.30000001192092896
+            Head Radius: 0.10000000149011612
+            Shaft Length: 1
+            Shaft Radius: 0.05000000074505806
+            Value: Arrow
+          Topic: /base_odom_1
+          Unreliable: false
+          Value: true
+        - Class: rviz/MarkerArray
+          Enabled: true
+          Marker Topic: /bpmp_tracker1/raw_primitive
+          Name: RawPrimitives
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: true
+        - Alpha: 0.20000000298023224
+          BoundColor: 255; 0; 0
+          Class: decomp_rviz_plugins/PolyhedronArray
+          Enabled: true
+          MeshColor: 0; 170; 255
+          Name: PolyhedronArray
+          Queue Size: 1
+          Scale: 0.10000000149011612
+          State: Mesh
+          Topic: /bpmp_tracker1/corridor
+          Unreliable: false
+          Value: true
+          VsColor: 0; 255; 0
+          VsScale: 1
+        - Class: rviz/MarkerArray
+          Enabled: true
+          Marker Topic: /bpmp_tracker1/feasible_primitives
+          Name: FeasiblePrimitives
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: true
+        - Class: rviz/MarkerArray
+          Enabled: true
+          Marker Topic: /bpmp_tracker1/best_primitives
+          Name: MarkerArray
+          Namespaces:
             {}
           Queue Size: 100
           Value: true
       Enabled: true
-      Name: GAR
+      Name: GAR1
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -396,6 +491,42 @@ Visualization Manager:
           Value: true
       Enabled: true
       Name: Dynamic_Obs
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /bpmp_simulator/object_vis
+      Name: Marker
+      Namespaces:
+        Object: true
+      Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 1
+        Min Value: 1
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: AxisColor
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.10000000149011612
+      Style: Flat Squares
+      Topic: /bpmp_simulator/point_cloud_obstacle
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -433,10 +564,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 22.100637435913086
+      Scale: 43.63493728637695
       Target Frame: current
-      X: 3.210754871368408
-      Y: 1.5864853858947754
+      X: 5.381494522094727
+      Y: 7.535286903381348
     Saved: ~
 Window Geometry:
   Displays:

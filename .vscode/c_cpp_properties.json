@@ -6,15 +6,10 @@
         "limitSymbolsToIncludedHeaders": false
       },
       "includePath": [
-        "/home/hsj/Cosys-AirSim/ros/python_ws/devel_isolated/wifi_msgs/include/**",
-        "/home/hsj/Cosys-AirSim/ros/python_ws/install_isolated/include/**",
-        "/home/hsj/ros_catkin_ws/devel_isolated/tf/include/**",
-        "/home/hsj/ros_catkin_ws/install_isolated/include/**",
-        "/home/hsj/Cosys-AirSim/ros2/install/umv_msgs/include/**",
-        "/home/hsj/Cosys-AirSim/ros2/install/airsim_ros_pkgs/include/**",
-        "/home/hsj/Cosys-AirSim/ros2/install/airsim_interfaces/include/**",
-        "/home/hsj/ros_catkin_ws/src/geometry/tf/include/**",
-        "/usr/include/**"
+        "${workspaceFolder}/**",
+        // "/home/seungwoo/catkin_ws/devel/include/**",
+        "/home/seungwoo/catkin_ws/devel/include/**",
+        "/opt/ros/noetic/include/**"
       ],
       "name": "ROS",
       "intelliSenseMode": "gcc-x64",

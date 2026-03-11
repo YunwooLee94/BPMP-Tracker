@@ -18,6 +18,7 @@ typedef std::vector<Eigen::Vector3d> Vec3List;
 namespace bpmp{
     struct VisualizationParam{
         std::string frame_id;
+        std::string tracker_frame_id;
         struct{
             bool publish{false};
             int num_time_sample{10};

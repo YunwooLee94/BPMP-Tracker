@@ -21,6 +21,8 @@ namespace bpmp{
     struct RosParam{
         double control_frequency;
         double planning_frequency;
+        string map_frame_id;
+        string tracker_frame_id;
     };
     class RosWrapper{
     public:
@@ -54,6 +56,7 @@ namespace bpmp{
         ros::Publisher tracker_raw_primitives_publisher_;
         ros::Publisher tracker_feasible_primitives_publisher_;
         ros::Publisher tracker_best_trajectory_publisher_;
+        ros::Publisher tracker_best_polystate_publisher_;
 
         ros::Publisher buffered_voronoi_cell_publisher_;
         ros::Publisher visibility_cell_publisher_;

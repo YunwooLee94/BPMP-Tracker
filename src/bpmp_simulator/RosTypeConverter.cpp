@@ -141,7 +141,7 @@ void bpmp::RosTypeConverter::RobotOdometryCallback(const nav_msgs::OdometryConst
     transform.setOrigin(tf::Vector3(msg->pose.pose.position.x,msg->pose.pose.position.y,msg->pose.pose.position.z));
     tf::Quaternion q(msg->pose.pose.orientation.x,msg->pose.pose.orientation.y,msg->pose.pose.orientation.z,msg->pose.pose.orientation.w);
     transform.setRotation(q);
-    br_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "current"));
+    br_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "current")); // TODO : Parameterize "current"
 }
 
 void bpmp::RosTypeConverter::Publish() {

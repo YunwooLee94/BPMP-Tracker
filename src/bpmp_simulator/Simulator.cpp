@@ -1,4 +1,5 @@
 #include <bpmp_simulator/Simulator.h>
+#include <cmath>
 void bpmp::Simulator::Run() {
     if (not analysis_mode_){
         double simulation_frequency = 1.0/simulation_dt_;
@@ -15,122 +16,7 @@ void bpmp::Simulator::Run() {
         }
     }
     else{
-        ros::Rate loop_rate(1.0/simulation_dt_);
-        double t0 = ros::Time::now().toSec();
-        double t_sim;
-        int test_cnt = 1; // For same target
-        int scenario_count = 0;
-        int success_count = 0;
-        int episode_count = 0;
-        bool fail_flag_target = false;
-        bool fail_flag_obstacle = false;
-        bool fail_flag_fov = false;
-        bool error_flag = false;
-        while(ros::ok()){
-            if(test_cnt>total_test_number_){
-                cout <<"TOTAL SCENARIO: "<<total_test_number_<< " SCENARIO CNT: "
-                     << scenario_count << ", SUCCESS CNT: " << success_count << endl;
-                break;
-            }
-            t_sim = ros::Time::now().toSec() - t0;
-            if (t_sim > object_history_list_[0].t.back()) {
-                episode_count++;
-                if(not error_flag)
-                    scenario_count++;
-                bool is_tracker_far_from_target = false;
-                double distance = sqrt(pow(current_target_state_.px - current_unicycle_state_.px, 2) +
-                                       pow(current_target_state_.py - current_unicycle_state_.py, 2));
-                if (distance > 5.0)
-                    is_tracker_far_from_target = true;
-
-                if (not(fail_flag_target or fail_flag_obstacle or fail_flag_fov or is_tracker_far_from_target))
-                    success_count++;
-                else {
-                    if(fail_flag_target)
-                        ROS_WARN("ROBOT COLLLIDES OR IS TOO FAR WITH TARGET");
-                    if(fail_flag_obstacle)
-                        ROS_WARN("ROBOT IS FAR FROM OBSTACLES");
-                    if(fail_flag_fov)
-                        ROS_WARN("ROBOT FAILS TO KEEP TARGET WITHIN FOV");
-                }
-                cout <<"TOTAL SCENARIO: "<<total_test_number_<< " SCENARIO CNT: "
-                     << scenario_count << ", SUCCESS CNT: " << success_count << endl;
-
-                fail_flag_obstacle = false;
-                fail_flag_target = false;
-                fail_flag_fov = false;
-                t0 = ros::Time::now().toSec();
-                test_cnt++;
-                ShuffleScenario();
-                double theta;
-                error_flag = true;
-                for(int try_idx=0;try_idx<100;try_idx++) {
-                    std::random_device rd;
-                    std::mt19937 gen(rd());
-                    double target_vel_start_x=0.0, target_vel_start_y=0.0;
-                    for(int i=0;i<100;i++){
-                        target_vel_start_x+=object_history_list_[target_idx_].vx[i];
-                        target_vel_start_y+=object_history_list_[target_idx_].vy[i];
-                        if(abs(target_vel_start_x)>1e-2 or abs(target_vel_start_y)>1e-2)
-                            break;
-                    }
-                    double start_azimuth = atan2(target_vel_start_y,target_vel_start_x)+M_PI;
-
-                    std::uniform_real_distribution<> theta_dis(start_azimuth-M_PI*0.1666667, start_azimuth+M_PI*0.1666667);
-                    unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
-                    theta = theta_dis(gen);
-                    current_unicycle_state_.px = object_history_list_[target_idx_].px.front() + 1.0 * cos(theta);
-                    current_unicycle_state_.py = object_history_list_[target_idx_].py.front() + 1.0 * sin(theta);
-                    current_unicycle_state_.pz = 0.5;
-                    current_unicycle_state_.theta = atan2(object_history_list_[target_idx_].py.front()-current_unicycle_state_.py,
-                                                          object_history_list_[target_idx_].px.front()-current_unicycle_state_.px);
-
-                    bool is_okay_at_start = true;
-                    double temp_distance_squared = 0.0;
-
-                    for (int j = 0; j < obstacle_idx_list_.size(); j++) {
-                        temp_distance_squared =
-                                pow(current_unicycle_state_.px - object_history_list_[obstacle_idx_list_[j]].px.front(), 2) +
-                                pow(current_unicycle_state_.py - object_history_list_[obstacle_idx_list_[j]].py.front(), 2);
-                        if (temp_distance_squared < 9*agent_size_ * agent_size_)
-                            is_okay_at_start = false;
-                    }
-                    if (is_okay_at_start){
-                        error_flag = false;
-                        break;
-                    }
-
-                }
-                t_sim = ros::Time::now().toSec() - t0;
-            }
-            UpdateDynamics(t_sim);
-            if (sqrt(pow(current_target_state_.px - current_unicycle_state_.px, 2) +
-                     pow(current_target_state_.py - current_unicycle_state_.py, 2)) < 2 * agent_size_) {
-                fail_flag_target = true;
-            } // Target-Robot Collision
-            if (sqrt(pow(current_target_state_.px - current_unicycle_state_.px, 2) +
-                     pow(current_target_state_.py - current_unicycle_state_.py, 2)) > 5.0) {
-                fail_flag_target = true;
-            } // Target-Robot Too Far
-            for (int idx = 0; idx < moving_obstacle_number_; idx++) {
-                if (sqrt(pow(current_obstacle_state_list_[idx].px - current_unicycle_state_.px, 2) +
-                         pow(current_obstacle_state_list_[idx].py - current_unicycle_state_.py, 2)) < 2 * agent_size_) {
-                    fail_flag_obstacle = true;
-                }
-            } // Obstacle-Robot Too Close
-            double direction = atan2(current_target_state_.py-current_unicycle_state_.py,current_target_state_.px-current_unicycle_state_.px);
-            double yaw_gap = direction-current_unicycle_state_.theta;
-            yaw_gap = fmod(yaw_gap+M_PI,2.0*M_PI);
-            if(yaw_gap<0)
-                yaw_gap += 2.0*M_PI;
-            yaw_gap -= M_PI;
-            if(abs(yaw_gap)>1.0472) // 1.0472: 60 degree, 1.309: 75 degree
-                fail_flag_fov = true;
-            PrepareRosMsgs(t_sim);
-            PublishRosMsgs();
-            ros::spinOnce();
-            loop_rate.sleep();
-        }
+        printf("ANALYSIS MODE IS NOT IMPLEMENTED\n");
     }
 }
 bpmp::Simulator::Simulator() : nh_("~") {
@@ -165,9 +51,12 @@ bpmp::Simulator::Simulator() : nh_("~") {
     nh_.param<int>("moving_obstacle_number", moving_obstacle_number_, 0);
     nh_.param<int>("total_test_number",total_test_number_,0);
 
+    nh_.param<double>("target_rate", target_rate_, 0.5);
+
     obstacle_vis_.header.frame_id = map_frame_id_;
     target_vis_.header.frame_id = map_frame_id_;
-    tracker_vis_.header.frame_id = map_frame_id_;
+    object_vis_.header.frame_id = map_frame_id_;
+    // tracker_vis_.header.frame_id = map_frame_id_;
 
 
     obstacle_vis_.type = visualization_msgs::Marker::CYLINDER;
@@ -199,64 +88,31 @@ bpmp::Simulator::Simulator() : nh_("~") {
     target_vis_.pose.orientation.y = 0.0;
     target_vis_.pose.orientation.z = 0.0;
 
-    point_cloud_.header.frame_id = map_frame_id_;
+    object_vis_.type = visualization_msgs::Marker::CUBE;
+    object_vis_.ns = "Object";
+    object_vis_.id = 0;
+    object_vis_.color.a = 0.5;
+    object_vis_.color.r = 0.0;
+    object_vis_.color.g = 0.0;
+    object_vis_.color.b = 1.0;
 
+
+    point_cloud_.header.frame_id = map_frame_id_;
     target_vis_publisher_ = nh_.advertise<visualization_msgs::Marker>("target_vis", 1);
     obstacle_list_vis_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("obstacle_list_vis", 1);
-    tracker_vis_publisher_ = nh_.advertise<nav_msgs::Odometry>("/base_odom", 1);
-
     obstacle_state_list_publisher_ = nh_.advertise<bpmp_tracker::ObjectStateList>("obstacle_state_list", 1);
     target_state_publisher_ = nh_.advertise<bpmp_tracker::ObjectState>("target_state", 1);
-    tracker_state_publisher_ = nh_.advertise<bpmp_tracker::UnicycleState>("tracker_state", 1);
-
+    
     pcl_publisher_ = nh_.advertise<pcl::PointCloud<pcl::PointXYZ>>("point_cloud_obstacle", 1);
     pcl_boxes_vis_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("pcl_boxes", 1);
 
+    object_vis_publisher_ = nh_.advertise<visualization_msgs::Marker>("object_vis", 1);
+    object_state_publisher_ = nh_.advertise<bpmp_tracker::ObjectState>("object_state", 1);
 
-    control_input_subscriber_ = nh_.subscribe("/bpmp_tracker/tracker_control_input", 1,
-                                              &Simulator::control_input_callback, this);
-    unicycle_control_input_subscriber_ = nh_.subscribe("/bpmp_tracker/unicycle_control_input", 1,
-                                              &Simulator::unicycle_input_callback, this);
+
     if(analysis_mode_){
-        ReadObjectTrajectory();
-        ShuffleScenario();
-        double theta;
-        while (true) {
-            std::random_device rd;
-            std::mt19937 gen(rd());
-            double target_vel_start_x=0.0, target_vel_start_y=0.0;
-            for(int i=0;i<100;i++){
-                target_vel_start_x+=object_history_list_[target_idx_].vx[i];
-                target_vel_start_y+=object_history_list_[target_idx_].vy[i];
-                if(abs(target_vel_start_x)>1e-2 or abs(target_vel_start_y)>1e-2)
-                    break;
-            }
-            double start_azimuth = atan2(target_vel_start_y,target_vel_start_x)+M_PI;
-            cout<<"START AZIMUTH Y: "<<target_vel_start_y
-                <<"X: "<<target_vel_start_x<<endl;
+        printf("ANALYSIS IS NOT IMPLEMENTED\n");
 
-            std::uniform_real_distribution<> theta_dis(start_azimuth-M_PI*0.1666667, start_azimuth+M_PI*0.1666667);
-            unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
-            theta = theta_dis(gen);
-            current_unicycle_state_.px = object_history_list_[target_idx_].px.front() + 1.0 * cos(theta);
-            current_unicycle_state_.py = object_history_list_[target_idx_].py.front() + 1.0 * sin(theta);
-            current_unicycle_state_.pz = 0.5;
-            current_unicycle_state_.theta = atan2(object_history_list_[target_idx_].py.front()-current_unicycle_state_.py,
-                                                  object_history_list_[target_idx_].px.front()-current_unicycle_state_.px);
-
-            bool is_okay_at_start = true;
-            double temp_distance_squared = 0.0;
-
-            for (int j = 0; j < obstacle_idx_list_.size(); j++) {
-                temp_distance_squared =
-                        pow(current_unicycle_state_.px - object_history_list_[obstacle_idx_list_[j]].px.front(), 2) +
-                        pow(current_unicycle_state_.py - object_history_list_[obstacle_idx_list_[j]].py.front(), 2);
-                if (temp_distance_squared < 9*agent_size_ * agent_size_)
-                    is_okay_at_start = false;
-            }
-            if (is_okay_at_start)
-                break;
-        }
     }
     else{
         ReadInitialTrackerStateList();
@@ -299,24 +155,37 @@ void bpmp::Simulator::ReadObjectTrajectory() {
         }
     }
 }
-
+Eigen::Matrix2d rot2(double theta){
+    Eigen::Matrix2d R;
+    R << cos(theta), -sin(theta),
+         sin(theta), cos(theta);
+    return R;
+}
 void bpmp::Simulator::UpdateDynamics(const double &t) {
     current_obstacle_state_list_.clear();
     State temp_state;
+    /////////////
+    // static bool only_once = true;
+    // if (only_once) {
+    //////////////
     {   // Target State
         current_target_state_.px = bpmp::interpolate(object_history_list_[target_idx_].t,
-                                                     object_history_list_[target_idx_].px, t);
+                                                     object_history_list_[target_idx_].px, t * target_rate_);
         current_target_state_.py = bpmp::interpolate(object_history_list_[target_idx_].t,
-                                                     object_history_list_[target_idx_].py, t);
+                                                     object_history_list_[target_idx_].py, t * target_rate_);
         current_target_state_.pz = bpmp::interpolate(object_history_list_[target_idx_].t,
-                                                     object_history_list_[target_idx_].pz, t);
+                                                     object_history_list_[target_idx_].pz, t * target_rate_);
         current_target_state_.vx = bpmp::interpolate(object_history_list_[target_idx_].t,
-                                                     object_history_list_[target_idx_].vx, t);
+                                                     object_history_list_[target_idx_].vx, t * target_rate_) * target_rate_;
         current_target_state_.vy = bpmp::interpolate(object_history_list_[target_idx_].t,
-                                                     object_history_list_[target_idx_].vy, t);
+                                                     object_history_list_[target_idx_].vy, t * target_rate_) * target_rate_;
         current_target_state_.vz = bpmp::interpolate(object_history_list_[target_idx_].t,
-                                                     object_history_list_[target_idx_].vz, t);
+                                                     object_history_list_[target_idx_].vz, t * target_rate_) * target_rate_;
     }
+    /////////////////
+    // only_once = false;
+    // }
+    /////////////////
     {   // Obstacle State
         for (int i = 0; i < obstacle_idx_list_.size(); i++) {
             temp_state.px = bpmp::interpolate(object_history_list_[obstacle_idx_list_[i]].t,
@@ -336,24 +205,213 @@ void bpmp::Simulator::UpdateDynamics(const double &t) {
     }
 
     static double t_prev = t;
+    
     double dt = t - t_prev;
-    current_unicycle_state_.px = current_unicycle_state_.px + unicycle_control_input_.linear_speed*cos(current_unicycle_state_.theta)*dt;
-    current_unicycle_state_.py = current_unicycle_state_.py + unicycle_control_input_.linear_speed*sin(current_unicycle_state_.theta)*dt;
-    current_unicycle_state_.theta = current_unicycle_state_.theta +unicycle_control_input_.angular_speed*dt;
+    if (dt <= 0.0) dt = 1e-6;
+
+    const size_t robot_count = current_unicycle_state_list_.size();
+    static std::vector<double> psi_dot;
+    if (psi_dot.size() != robot_count) psi_dot.assign(robot_count, 0.0);
+
+    const auto clamp = [](double v, double lo, double hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
+    };
+    const auto perp = [](double x, double y) {
+        return std::pair<double, double>{-y, x};
+    };
+
+    // parameters (from script/test/tmp.py)
+    constexpr double Kv = 20.0;
+    constexpr double Ft_max = 10.0;
+    constexpr double c_roll = 0.0;
+    constexpr double f_roll = 0.0;
+    constexpr double eps_v = 0.1;
+    constexpr double c_lat = 100.0;
+    constexpr double mu_lat = 0.5;
+    constexpr double Kw = 10.0;
+    constexpr double tau_max = 5.0;
+    constexpr double c_yaw = 0.0;
+    constexpr double J_robot = 0.5;
+    constexpr double m_eff = 10.0;
+    constexpr double J_eff = 5.0;
+    constexpr double normal_force = 200.0;
+
+    const double theta = current_object_state_.theta;
+    const double c_theta = cos(theta);
+    const double s_theta = sin(theta);
+    double vx = current_object_state_.vx;
+    double vy = current_object_state_.vy;
+    double omega = current_object_state_.theta_dot;
+
+    double F_total_x = 0.0, F_total_y = 0.0;
+    double tau_total = 0.0;
+    std::vector<double> psi_ddot(robot_count, 0.0);
+
+    for (size_t i = 0; i < robot_count; ++i) {
+        const double r_obj_x = get<0>(init_unicycle_pose_list_[i]);
+        const double r_obj_y = get<1>(init_unicycle_pose_list_[i]);
+
+        const double r_w_x = c_theta * r_obj_x - s_theta * r_obj_y;
+        const double r_w_y = s_theta * r_obj_x + c_theta * r_obj_y;
+
+        const auto pperp = perp(r_w_x, r_w_y);
+        const double v_i_x = vx + omega * pperp.first;
+        const double v_i_y = vy + omega * pperp.second;
+
+        const double psi = current_unicycle_state_list_[i].theta;
+        const double c_psi = cos(psi);
+        const double s_psi = sin(psi);
+        const double t_x = c_psi;
+        const double t_y = s_psi;
+        const double n_x = -s_psi;
+        const double n_y = c_psi;
+
+        const double v_t = t_x * v_i_x + t_y * v_i_y;
+        const double v_n = n_x * v_i_x + n_y * v_i_y;
+
+        const double v_cmd = unicycle_control_input_list_[i].linear_speed;
+        const double w_cmd = unicycle_control_input_list_[i].angular_speed;
+
+        const double F_drive = clamp(Kv * (v_cmd - v_t), -Ft_max, Ft_max);
+        const double F_roll = -c_roll * v_t - f_roll * tanh(v_t / eps_v);
+        const double F_lat = -clamp(c_lat * v_n, -mu_lat * normal_force, mu_lat * normal_force);
+
+        const double F_i_x = (F_drive + F_roll) * t_x + F_lat * n_x;
+        const double F_i_y = (F_drive + F_roll) * t_y + F_lat * n_y;
+
+        F_total_x += F_i_x;
+        F_total_y += F_i_y;
+        tau_total += r_w_x * F_i_y - r_w_y * F_i_x;
+
+        const double tau_i = clamp(Kw * (w_cmd - psi_dot[i]), -tau_max, tau_max);
+        psi_ddot[i] = (tau_i - c_yaw * psi_dot[i]) / J_robot;
+    }
+
+    const double a_x = F_total_x / m_eff;
+    const double a_y = F_total_y / m_eff;
+    const double alpha = tau_total / J_eff;
+
+    // semi-implicit Euler
+    vx += a_x * dt;
+    vy += a_y * dt;
+    omega += alpha * dt;
+
+    const double theta_new = theta + omega * dt;
+    for (size_t i = 0; i < robot_count; ++i) {
+        psi_dot[i] += psi_ddot[i] * dt;
+        current_unicycle_state_list_[i].theta += psi_dot[i] * dt;
+        current_unicycle_state_list_[i].theta_dot = psi_dot[i];
+    }
+
+    current_object_state_.px += vx * dt;
+    current_object_state_.py += vy * dt;
+    current_object_state_.theta = theta_new;
+    current_object_state_.vx = vx;
+    current_object_state_.vy = vy;
+    current_object_state_.theta_dot = omega;
+    current_object_state_.ax = a_x;
+    current_object_state_.ay = a_y;
+    current_object_state_.az = 0.0;
+
+    const double c_th = cos(theta_new);
+    const double s_th = sin(theta_new);
+    for (size_t i = 0; i < robot_count; ++i) {
+        const double rx = get<0>(init_unicycle_pose_list_[i]);
+        const double ry = get<1>(init_unicycle_pose_list_[i]);
+        const double rwx = c_th * rx - s_th * ry;
+        const double rwy = s_th * rx + c_th * ry;
+        current_unicycle_state_list_[i].px = current_object_state_.px + rwx;
+        current_unicycle_state_list_[i].py = current_object_state_.py + rwy;
+    }
+
 //    std::cout<<"DT: "<<dt<<std::endl;
     t_prev = t;
 }
 
 void bpmp::Simulator::ReadInitialTrackerStateList() {
-    std::ifstream initial_state_file;
-    initial_state_file.open(initial_state_file_name_.c_str());
-    if (initial_state_file.is_open())
-        initial_state_file>>current_unicycle_state_.px >>current_unicycle_state_.py >> current_unicycle_state_.pz >>current_unicycle_state_.theta;
+
+    std::ifstream initial_state_file(initial_state_file_name_);
+    if (!initial_state_file.is_open()) {
+        throw std::runtime_error("failed to open " + initial_state_file_name_);
+    }
     else{
-        current_unicycle_state_.px = 0.0, current_unicycle_state_.py = 0.0, current_unicycle_state_.pz = 1.0, current_unicycle_state_.theta = 0.0;
+        printf("INITIAL STATE FILE OPENED SUCCESSFULLY: %s\n", initial_state_file_name_.c_str());
+    }
+
+    std::string line;
+    current_object_state_.vx = 0.0;
+    current_object_state_.vy = 0.0;
+    current_object_state_.vz = 0.0;
+    current_object_state_.ax = 0.0;
+    current_object_state_.ay = 0.0;
+    current_object_state_.az = 0.0;
+
+    // 1) 첫 줄: 현재 객체 상태 + 크기
+    if (std::getline(initial_state_file, line)) {
+        std::istringstream ss(line);
+        ss >> current_object_state_.px
+        >> current_object_state_.py
+        >> current_object_state_.theta
+        >> object_rectangle_size_.first
+        >> object_rectangle_size_.second;
+        current_object_state_.pz = 0.5;
+        printf("INITIAL OBJECT STATE: PX: %.2f, PY: %.2f, THETA: %.2f, SIZE_X: %.2f, SIZE_Y: %.2f\n",
+               current_object_state_.px, current_object_state_.py, current_object_state_.theta,
+               object_rectangle_size_.first, object_rectangle_size_.second);
+    }
+    object_vis_.scale.x = object_rectangle_size_.first;
+    object_vis_.scale.y = object_rectangle_size_.second;
+    object_vis_.scale.z = 2.0;
+
+    current_unicycle_state_list_.clear();
+
+    robot_num_ = 0;
+    tracker_vis_list_.clear();
+    line.clear();
+
+    while (std::getline(initial_state_file, line)) {
+        
+        std::istringstream ss(line);
+
+        double x, y, theta;
+        if (ss >> x >> y >> theta) {
+            robot_num_ ++;
+            UnicycleState obj{};
+            printf("INITIAL UNICYCLE STATE %d: X: %.2f, Y: %.2f, THETA: %.2f\n", robot_num_-1, x, y, theta);
+            obj.pz = 0.5;              // 기본값
+            obj.px = current_object_state_.px + x * cos(current_object_state_.theta) - y * sin(current_object_state_.theta);  // 객체 위치에 상대적으로 배치
+            obj.py = current_object_state_.py + x * sin(current_object_state_.theta) + y * cos(current_object_state_.theta);
+            obj.theta = current_object_state_.theta + theta;
+            current_unicycle_state_list_.push_back(obj);   // 컨테이너에 저장
+            init_unicycle_pose_list_.emplace_back(x, y);
+            unicycle_control_input_list_.emplace_back(); // 초기화된 제어 입력 추가
+
+            // Modified as multiple unicycle trackers are supported
+            ros::Publisher tracker_state_publisher = nh_.advertise<bpmp_tracker::UnicycleState>("tracker_state_" + std::to_string(robot_num_-1), 1);
+            tracker_state_publisher_list_.push_back(tracker_state_publisher);
+            unicycle_control_input_subscriber_list_.push_back(
+                    nh_.subscribe<bpmp_tracker::UnicycleInput>(
+                            "/bpmp_tracker/unicycle_control_input_" + std::to_string(robot_num_-1), 1,
+                            boost::bind(&Simulator::unicycle_input_callback_multi_, this, _1, robot_num_-1)));
+            tracker_vis_publisher_list_.push_back(nh_.advertise<nav_msgs::Odometry>("/base_odom_" + std::to_string(robot_num_-1), 1));
+            tracker_vis_list_.emplace_back(); // 초기화된 시각화 메시지 추가
+            tracker_vis_list_.back().header.frame_id = map_frame_id_;
+
+        }
+        line.clear();
     }
     initial_state_file.close();
-    unicycle_control_input_.linear_speed =0.0, unicycle_control_input_.angular_speed = 0.0;
+    for (auto &input : unicycle_control_input_list_) {
+        input.linear_speed = 0.0;
+        input.angular_speed = 0.0;
+    }
+
+    printf("TOTAL UNICYCLE TRACKER NUMBER: %d\n", robot_num_);
+    tracker_state_msg_list_.clear();
+    for (int i = 0; i < robot_num_; i++) {
+        bpmp_tracker::UnicycleState temp_msg;
+        tracker_state_msg_list_.push_back(temp_msg);
+    }
 }
 
 void bpmp::Simulator::PrepareRosMsgs(const double &t) {
@@ -373,19 +431,27 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
         obstacle_list_vis_.markers.push_back(obstacle_vis_);
     }
     // Tracker Visualization (Nav_msgs in Unicycle Simulator)
-    tracker_vis_.pose.pose.position.x = current_unicycle_state_.px;
-    tracker_vis_.pose.pose.position.y = current_unicycle_state_.py;
-    tracker_vis_.pose.pose.position.z = 0.5;
-    tracker_vis_.pose.pose.orientation.x = 0.0;
-    tracker_vis_.pose.pose.orientation.y = 0.0;
-    tracker_vis_.pose.pose.orientation.z = sin(0.5*current_unicycle_state_.theta);
-    tracker_vis_.pose.pose.orientation.w = cos(0.5*current_unicycle_state_.theta);
-    // Tracker tf Publish
-    tf::Transform transform;
-    transform.setOrigin(tf::Vector3(tracker_vis_.pose.pose.position.x,tracker_vis_.pose.pose.position.y,tracker_vis_.pose.pose.position.z));
-    tf::Quaternion q(tracker_vis_.pose.pose.orientation.x,tracker_vis_.pose.pose.orientation.y,tracker_vis_.pose.pose.orientation.z,tracker_vis_.pose.pose.orientation.w);
-    transform.setRotation(q);
-    br_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "current"));
+    for (int i = 0; i < current_unicycle_state_list_.size(); i++) {
+        tracker_vis_list_[i].header.stamp = ros::Time::now();
+        tracker_vis_list_[i].pose.pose.position.x = current_unicycle_state_list_[i].px;
+        tracker_vis_list_[i].pose.pose.position.y = current_unicycle_state_list_[i].py;
+        tracker_vis_list_[i].pose.pose.position.z = 0.5;
+        tracker_vis_list_[i].pose.pose.orientation.x = 0.0;
+        tracker_vis_list_[i].pose.pose.orientation.y = 0.0;
+        tracker_vis_list_[i].pose.pose.orientation.z = sin(0.5*current_unicycle_state_list_[i].theta);
+        tracker_vis_list_[i].pose.pose.orientation.w = cos(0.5*current_unicycle_state_list_[i].theta);
+        // Tracker tf Publish
+        tf::Transform transform;
+        transform.setOrigin(tf::Vector3(tracker_vis_list_[i].pose.pose.position.x,tracker_vis_list_[i].pose.pose.position.y,tracker_vis_list_[i].pose.pose.position.z));
+        tf::Quaternion q(tracker_vis_list_[i].pose.pose.orientation.x,tracker_vis_list_[i].pose.pose.orientation.y,tracker_vis_list_[i].pose.pose.orientation.z,tracker_vis_list_[i].pose.pose.orientation.w);
+        transform.setRotation(q);
+        br_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "robot_" + std::to_string(i) + "_base_link"));
+        tracker_state_msg_list_[i].px = current_unicycle_state_list_[i].px;
+        tracker_state_msg_list_[i].py = current_unicycle_state_list_[i].py;
+        tracker_state_msg_list_[i].pz = current_unicycle_state_list_[i].pz;
+        tracker_state_msg_list_[i].theta = current_unicycle_state_list_[i].theta;
+    }
+    
     // target_state
     target_state_msg_.px = current_target_state_.px;
     target_state_msg_.py = current_target_state_.py;
@@ -405,35 +471,52 @@ void bpmp::Simulator::PrepareRosMsgs(const double &t) {
         object_state_temp.vz = current_obstacle_state_list_[i].vz;
         obstacle_state_list_msg_.object_state_list.push_back(object_state_temp);
     }
-    tracker_state_msg_.px = current_unicycle_state_.px;
-    tracker_state_msg_.py = current_unicycle_state_.py;
-    tracker_state_msg_.pz = current_unicycle_state_.pz;
-    tracker_state_msg_.theta = current_unicycle_state_.theta;
+
+    // object_vis
+    object_vis_.pose.position.x = current_object_state_.px;
+    object_vis_.pose.position.y = current_object_state_.py;
+    object_vis_.pose.position.z = 0.5;
+    object_vis_.pose.orientation.x = 0.0;
+    object_vis_.pose.orientation.y = 0.0;
+    object_vis_.pose.orientation.z = sin(0.5*current_object_state_.theta);
+    object_vis_.pose.orientation.w = cos(0.5*current_object_state_.theta);
+
+    object_state_msg_.px = current_object_state_.px;
+    object_state_msg_.py = current_object_state_.py;
+    object_state_msg_.pz = current_object_state_.pz;
+    object_state_msg_.vx = current_object_state_.vx;
+    object_state_msg_.vy = current_object_state_.vy;
+    object_state_msg_.vz = current_object_state_.vz;
+    object_state_msg_.ax = current_object_state_.ax;
+    object_state_msg_.ay = current_object_state_.ay;
+    object_state_msg_.az = current_object_state_.az;
+    object_state_msg_.theta = current_object_state_.theta;
+    object_state_msg_.theta_dot = current_object_state_.theta_dot;
+
+    tf::Transform transform;
+    transform.setOrigin(tf::Vector3(object_vis_.pose.position.x,object_vis_.pose.position.y,object_vis_.pose.position.z));
+    tf::Quaternion q(object_vis_.pose.orientation.x,object_vis_.pose.orientation.y,object_vis_.pose.orientation.z,object_vis_.pose.orientation.w);
+    transform.setRotation(q);
+    br_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "object_base_link"));
+
+
 }
 
 void bpmp::Simulator::PublishRosMsgs() {
-    tracker_vis_publisher_.publish(tracker_vis_);
+    for (int i = 0; i < current_unicycle_state_list_.size(); i++) {
+        tracker_vis_publisher_list_[i].publish(tracker_vis_list_[i]);
+        tracker_state_publisher_list_[i].publish(tracker_state_msg_list_[i]);
+    }
+    object_state_publisher_.publish(object_state_msg_);
+    object_vis_publisher_.publish(object_vis_);
     obstacle_list_vis_publisher_.publish(obstacle_list_vis_);
     target_vis_publisher_.publish(target_vis_);
     if(is_unstructured_){
         pcl_publisher_.publish(point_cloud_);
         pcl_boxes_vis_publisher_.publish(pcl_boxes_vis_);
     }
-    tracker_state_publisher_.publish(tracker_state_msg_);
     obstacle_state_list_publisher_.publish(obstacle_state_list_msg_);
     target_state_publisher_.publish(target_state_msg_);
-}
-
-void bpmp::Simulator::control_input_callback(const bpmp_tracker::ControlInput &msg) {
-    tracker_control_input.px = msg.px;
-    tracker_control_input.py = msg.py;
-    tracker_control_input.pz = msg.pz;
-    tracker_control_input.vx = msg.vx;
-    tracker_control_input.vy = msg.vy;
-    tracker_control_input.vz = msg.vz;
-    tracker_control_input.ax = msg.ax;
-    tracker_control_input.ay = msg.ay;
-    tracker_control_input.az = msg.az;
 }
 
 void bpmp::Simulator::ReadObstacleConfiguration() {
@@ -540,34 +623,7 @@ void bpmp::Simulator::ReadObstacleConfiguration() {
     obstacle_file.close();
 }
 
-void bpmp::Simulator::unicycle_input_callback(const bpmp_tracker::UnicycleInput &msg) {
-    unicycle_control_input_.linear_speed = msg.vel_linear;
-    unicycle_control_input_.angular_speed = msg.vel_angular;
-}
-
-void bpmp::Simulator::ShuffleScenario() {
-    vector<int> index_array = GenerateUniqueRandomArray(moving_obstacle_number_ + 1, 0, object_number_-1);
-    target_idx_ = index_array.back();
-    index_array.pop_back();
-    obstacle_idx_list_.clear();
-    obstacle_idx_list_ = index_array;
-}
-
-std::vector<int> bpmp::Simulator::GenerateUniqueRandomArray(int size, int lower_bound, int upper_bound) {
-    // Ensure that the range is large enough to have unique numbers
-    if (upper_bound - lower_bound + 1 < size) {
-        throw std::invalid_argument("Range too small to generate unique numbers of this size.");
-    }
-    // Create a vector containing all possible numbers within the range
-    std::vector<int> allNumbers;
-    for (int i = lower_bound; i <= upper_bound; ++i) {
-        allNumbers.push_back(i);
-    }
-    // Initialize a random number generator
-    std::mt19937 rng(static_cast<unsigned int>(std::time(nullptr)));
-    // Shuffle the numbers
-    std::shuffle(allNumbers.begin(), allNumbers.end(), rng);
-    // Take the first 'size' elements from the shuffled vector
-    std::vector<int> randomArray(allNumbers.begin(), allNumbers.begin() + size);
-    return randomArray;
+void bpmp::Simulator::unicycle_input_callback_multi_(const bpmp_tracker::UnicycleInput::ConstPtr &msg, int robot_num) {
+    unicycle_control_input_list_[robot_num].linear_speed = msg->vel_linear;
+    unicycle_control_input_list_[robot_num].angular_speed = msg->vel_angular;
 }

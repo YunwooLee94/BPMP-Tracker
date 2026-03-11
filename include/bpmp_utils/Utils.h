@@ -71,12 +71,18 @@ namespace bpmp{
         double vx;
         double vy;
         double vz;
+        double ax;
+        double ay;
+        double az;
+        double theta;
+        double theta_dot;
     };
     struct UnicycleState{
         double px;
         double py;
         double pz;
         double theta;
+        double theta_dot;
     };
     struct UnicycleControlInput{
         double linear_speed;

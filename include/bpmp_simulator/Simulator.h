@@ -23,6 +23,7 @@
 #include <bpmp_tracker/UnicycleState.h>
 #include <bpmp_utils/Utils.h>
 #include <algorithm>
+#include <tuple>
 #include <vector>
 #include <ctime>
 #include <bpmp_utils/eigenmvn.h>
@@ -50,14 +51,16 @@ namespace bpmp{
         int target_idx_;
         int moving_obstacle_number_;
         int total_test_number_;
+        double target_rate_;
         vector<int> obstacle_idx_list_;
 
         pcl::PointCloud<pcl::PointXYZ> point_cloud_;
         vector<StateHistory> object_history_list_;
-        State current_tracker_state_;
-        UnicycleState current_unicycle_state_;
-        ControlInput tracker_control_input;
-        UnicycleControlInput unicycle_control_input_;
+        vector<UnicycleState> current_unicycle_state_list_;
+        vector<tuple<double, double>> init_unicycle_pose_list_;
+        State current_object_state_;
+        pair<double, double> object_rectangle_size_;
+        vector<UnicycleControlInput> unicycle_control_input_list_;
         State current_target_state_;
         vector<State> current_obstacle_state_list_;
         string initial_state_file_name_;
@@ -76,25 +79,32 @@ namespace bpmp{
         visualization_msgs::MarkerArray obstacle_list_vis_;
         visualization_msgs::Marker obstacle_vis_;
         visualization_msgs::Marker target_vis_;
-        nav_msgs::Odometry tracker_vis_;
+        vector<nav_msgs::Odometry> tracker_vis_list_;
         visualization_msgs::MarkerArray pcl_boxes_vis_;
+        visualization_msgs::Marker object_vis_;
 
         ros::Publisher target_vis_publisher_;
         ros::Publisher obstacle_list_vis_publisher_;
-        ros::Publisher tracker_vis_publisher_;
+        vector<ros::Publisher> tracker_vis_publisher_list_;
         ros::Publisher pcl_publisher_;
         ros::Publisher pcl_boxes_vis_publisher_;
+        ros::Publisher object_vis_publisher_;
+        ros::Publisher object_state_publisher_;
 
-        ros::Subscriber control_input_subscriber_;
-        ros::Subscriber unicycle_control_input_subscriber_;
-        void control_input_callback(const bpmp_tracker::ControlInput &msg);
-        void unicycle_input_callback(const bpmp_tracker::UnicycleInput &msg);
+        vector<ros::Subscriber> unicycle_control_input_subscriber_list_;
+        // void control_input_callback(const bpmp_tracker::ControlInput &msg);
+        // void unicycle_input_callback(const bpmp_tracker::UnicycleInput &msg);
+        // Callback for each unicycle control input; takes a ROS ConstPtr to match subscribe() expectations.
+        void unicycle_input_callback_multi_(const bpmp_tracker::UnicycleInput::ConstPtr &msg, int robot_num);
+
         ros::Publisher target_state_publisher_;
         ros::Publisher obstacle_state_list_publisher_;
-        ros::Publisher tracker_state_publisher_;
+        vector<ros::Publisher> tracker_state_publisher_list_;
         bpmp_tracker::ObjectState target_state_msg_;
         bpmp_tracker::ObjectStateList obstacle_state_list_msg_;
-        bpmp_tracker::UnicycleState tracker_state_msg_;
+        vector<bpmp_tracker::UnicycleState> tracker_state_msg_list_;
+        bpmp_tracker::ObjectState object_state_msg_;
+        int robot_num_{0};
 
         tf::TransformBroadcaster br_;
 

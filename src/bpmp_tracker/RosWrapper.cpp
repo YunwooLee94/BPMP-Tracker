@@ -22,6 +22,8 @@ void bpmp::RosWrapper::PrepareRosMsgs() {
 
 }
 void bpmp::RosWrapper::PublishRosMsgs() {
+    // ROS_INFO_STREAM("TEST");
+
     { // RAW
         p_base_->mutex_set_[1].lock();
         tracker_raw_primitives_publisher_.publish(
@@ -37,16 +39,49 @@ void bpmp::RosWrapper::PublishRosMsgs() {
     }
     {   // BEST
         p_base_->mutex_set_[1].lock();
-        if(p_base_->success_flag_)
+        if(p_base_->success_flag_){
+            ROS_INFO_STREAM("Planning Success. Publish Best Primitive.");
             tracker_best_trajectory_publisher_.publish(
                 visualizer_->VisualizeBestPrimitive(p_base_->tracker_raw_primitives_, p_base_->tracker_best_index_));
+
+            // Polynomial Description
+            const auto &best = p_base_->tracker_raw_primitives_[p_base_->tracker_best_index_];
+            bpmp_tracker::PolyState result;
+            result.t0 = best.t0;
+            result.tf = best.tf;
+
+            // transform Bernstein control points from tracker frame to map frame
+            bpmp::UnicycleState tracker_state;
+            p_base_->mutex_set_[0].lock();
+            tracker_state = p_base_->current_tracker_list_read_;
+            p_base_->mutex_set_[0].unlock();
+
+            const double c = cos(tracker_state.theta);
+            const double s = sin(tracker_state.theta);
+            for (int i = 0; i < 4; i++) {
+                const double lx = best.ctrl_x[i];
+                const double ly = best.ctrl_y[i];
+                const double lz = best.ctrl_z[i];
+                const double wx = tracker_state.px + c * lx - s * ly;
+                const double wy = tracker_state.py + s * lx + c * ly;
+                const double wz = tracker_state.pz + lz;
+                result.x_coeff.push_back(wx);
+                result.y_coeff.push_back(wy);
+                result.z_coeff.push_back(wz);
+            }
+            tracker_best_polystate_publisher_.publish(result);
+        }
         p_base_->mutex_set_[1].unlock();
+
     }
     {   // CONTROL INPUT
         p_base_->mutex_set_[1].lock();
-        if(p_base_->success_flag_)
+        if(p_base_->success_flag_){
+            // ROS_INFO_STREAM("Planning Success. Publish Control Input.");
             tracker_control_input_publisher_.publish(GenerateControlInput(p_base_->tracker_raw_primitives_,p_base_->tracker_best_index_,this->GetCurrentTime()));
+        }
         else{
+            // ROS_INFO_STREAM("Planning Failed. Publish Zero Control Input.");
             bpmp_tracker::UnicycleInput zero_input;
             zero_input.vel_linear = 0.0;
             p_base_->mutex_set_[0].lock();
@@ -72,7 +107,7 @@ void bpmp::RosWrapper::PublishRosMsgs() {
         p_base_->mutex_set_[1].lock();
         if(not p_base_->polys_.empty()){
             decomp_ros_msgs::PolyhedronArray polyhedron_msg = DecompROS::polyhedron_array_to_ros(p_base_->polys_);
-            polyhedron_msg.header.frame_id = "current"; // TODO: Should be parameterized
+            polyhedron_msg.header.frame_id = ros_param_.tracker_frame_id;
             corridor_publisher_.publish(polyhedron_msg);
         }
         p_base_->mutex_set_[1].unlock();
@@ -100,10 +135,10 @@ void bpmp::RosWrapper::InitSubscriberAndPublisher() {
     tracker_raw_primitives_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("raw_primitive", 1);
     tracker_feasible_primitives_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("feasible_primitives", 1);
     tracker_best_trajectory_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("best_primitives", 1);
+    tracker_best_polystate_publisher_ = nh_.advertise<bpmp_tracker::PolyState>("best_polystate", 1);
     tracker_control_input_publisher_ = nh_.advertise<bpmp_tracker::UnicycleInput>("unicycle_control_input", 1);
     buffered_voronoi_cell_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("buffered_voronoi_cell",1);
     visibility_cell_publisher_ = nh_.advertise<visualization_msgs::MarkerArray>("visibility_cell",1);
-//    tracker_raw_primitives_publisher_ = nh_.advertise<
 }
 void bpmp::RosWrapper::ObstacleStateListCallback(const bpmp_tracker::ObjectStateList &msg) {
     bpmp::State obstacle_state;
@@ -155,9 +190,12 @@ bpmp::RosWrapper::RosWrapper(std::shared_ptr<bpmp::PlannerBase> p_base) : p_base
     // ROS PARAM
     nh_.param<double>("control_frequency", ros_param_.control_frequency, 100.0);
     nh_.param<double>("planning_frequency", ros_param_.planning_frequency, 30.0);
+    nh_.param<string>("map_frame_id", ros_param_.map_frame_id, "map");
+    nh_.param<string>("tracker_frame_id", ros_param_.tracker_frame_id, "base_link");
 
     // VISUALIZATION PARAM
     nh_.param<std::string>("map_frame_id", vis_param_.frame_id, "map");
+    nh_.param<std::string>("tracker_frame_id", vis_param_.tracker_frame_id, "base_link");
     nh_.param<bool>("raw_primitives/publish", vis_param_.raw_primitives.publish, false);
     nh_.param<int>("raw_primitives/num_time_sample", vis_param_.raw_primitives.num_time_sample, 10);
     nh_.param<double>("raw_primitives/proportion", vis_param_.raw_primitives.proportion, 0.0);
@@ -225,6 +263,7 @@ bpmp::RosWrapper::RosWrapper(std::shared_ptr<bpmp::PlannerBase> p_base) : p_base
     nh_.param<double>("axis_limit/min_y", planning_param_.axis_limit.min_y, 0.0);
     nh_.param<double>("axis_limit/max_x", planning_param_.axis_limit.max_x, 0.0);
     nh_.param<double>("axis_limit/max_y", planning_param_.axis_limit.max_y, 0.0);
+
 }
 bpmp_tracker::UnicycleInput
 bpmp::RosWrapper::GenerateControlInput(const std::vector<bpmp::PrimitivePlanning> &primitive,

@@ -2,21 +2,20 @@ control_frequency: 50.0
 planning_frequency: 20.0
 horizon: 1.0
 num_thread: 4
-num_sample_planning: 1200 # 2000
-r_min: 0.8
-r_max: 1.2
+num_sample_planning: 2000 # 2000
+r_min: 0.0
+r_max: 4.0
 safe_distance: 0.01 # 0.05
 distance_max: 5.0 # 2.0
 terminal_weight: 10.0
 vel_max: 3.0 # 2.0
 acc_max: 6.0 # 3.0
 ang_max: 3.14 # 2.09
-fov: 2.09 #(120 degree)
+fov: 3.14 #(180 degree)
 object_radius: 0.3
 is_experiment: false
 is_unstructured: true
 sample_mode: 0 # 0: fov_considerd, 1 fov_not_considered
 check_mode: 0 # 0: proposed, 1: DMVC-Tracker, 2:BPMP-Tracker
 map_frame_id: "map"
-tracker_frame_id: "robot_0_base_link"
-
+tracker_frame_id: "robot_1_base_link"

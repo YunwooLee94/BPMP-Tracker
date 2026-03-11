@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="rviz_display" default="true"/>
+    <group if = "$(arg rviz_display)">
+        <node name="rviz" pkg="rviz" type="rviz" args="-d $(find bpmp_tracker)/launch/rviz_config/unstructured_sim_multi.rviz" output="log"/>
+    </group>
+
+    <node pkg="bpmp_tracker" type="bpmp_simulator" name="bpmp_simulator" output="screen">
+        <rosparam command="load" file="$(find bpmp_tracker)/param/sim_unstructured.yaml"/>
+        <param name="obstacle_configuration_file_name" value="$(find bpmp_tracker)/world/obstacle_configuration.txt"/>
+        <param name="object_history_file_name" value="$(find bpmp_tracker)/world/bpmp_tracker_sim_unstructured.csv"/>
+        <param name="initial_state_file_name" value="$(find bpmp_tracker)/world/initial_trajectory_multi.txt"/>
+    </node>
+    <node pkg="bpmp_tracker" type="bpmp_predictor" name="bpmp_predictor" output="screen">
+        <rosparam command="load" file="$(find bpmp_tracker)/param/predictor.yaml"/>
+        <rosparam command="load" file="$(find bpmp_tracker)/param/prediction_visualizer.yaml"/>
+    </node>
+    <node pkg="bpmp_tracker" type="bpmp_tracker" name="bpmp_tracker" output="log">
+        <rosparam command="load" file="$(find bpmp_tracker)/param/planner.yaml"/>
+        <rosparam command="load" file="$(find bpmp_tracker)/param/planning_visualizer.yaml"/>
+        <remap from="/base_odom" to="/base_odom_0"/>
+        <remap from="/bpmp_tracker/unicycle_control_input" to="/bpmp_tracker/unicycle_control_input_0"/>
+    </node>
+
+    <node pkg="bpmp_tracker" type="bpmp_tracker" name="bpmp_tracker1" output="screen">
+        <rosparam command="load" file="$(find bpmp_tracker)/param/planner2.yaml"/>
+        <rosparam command="load" file="$(find bpmp_tracker)/param/planning_visualizer.yaml"/>
+        <remap from="/base_odom" to="/base_odom_1"/>
+        <remap from="/bpmp_predictor/target_prediction" to="/bpmp_tracker/best_polystate"/>
+        <remap from="/bpmp_tracker1/unicycle_control_input" to="/bpmp_tracker/unicycle_control_input_1"/>
+    </node>
+
+</launch>
